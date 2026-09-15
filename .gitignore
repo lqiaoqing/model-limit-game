@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+.vite/
+coverage/
+playwright-report/
+test-results/
+# Keep artifacts/ (evidence) but ignore bulky capture dumps if needed
+# artifacts/screens/
+# artifacts/evidence-run/
+# artifacts/premium-1/
+# artifacts/showcase-*/
+# artifacts/gpu-1/

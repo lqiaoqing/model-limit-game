@@ -1,0 +1,120 @@
+{
+  "url": "http://127.0.0.1:5188",
+  "mode": "desktop",
+  "state": "stress",
+  "requestedState": "stress",
+  "appliedState": "stress",
+  "runId": "premium-1",
+  "seed": 42,
+  "screenshotPath": "artifacts\\premium-1\\desktop-stress.png",
+  "gpu": {
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "vendor": "Google Inc. (Google)",
+    "softwareRendered": true
+  },
+  "result": {
+    "ok": true,
+    "reason": "nonblank",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 720
+    },
+    "drawingBuffer": {
+      "width": 1280,
+      "height": 720
+    },
+    "alphaPixels": 4096,
+    "variance": 255,
+    "colorBuckets": 92,
+    "metrics": {
+      "colorBuckets": 155,
+      "colorEntropyBits": 1.27,
+      "edgeDensity": 0.127,
+      "luminance": {
+        "mean": 11.3,
+        "p5": 0,
+        "p95": 54.1,
+        "contrast": 54.1
+      },
+      "dominantColorShare": 0.846,
+      "nonBackgroundShare": 0.154
+    },
+    "renderBudget": {
+      "tier": "desktop",
+      "note": "starting-point budget; adjust per game and document overrides",
+      "rows": [
+        {
+          "metric": "calls",
+          "actual": 231,
+          "limit": 300,
+          "ok": true
+        },
+        {
+          "metric": "triangles",
+          "actual": 5822,
+          "limit": 750000,
+          "ok": true
+        },
+        {
+          "metric": "geometries",
+          "actual": 164,
+          "limit": 300,
+          "ok": true
+        },
+        {
+          "metric": "textures",
+          "actual": 34,
+          "limit": 60,
+          "ok": true
+        }
+      ],
+      "withinBudget": true
+    },
+    "diagnostics": {
+      "frame": 136,
+      "elapsed": 0,
+      "score": 0,
+      "complete": false,
+      "mode": "play",
+      "wave": 8,
+      "enemies": 120,
+      "combo": 1,
+      "peakCombo": 1,
+      "fps": 12,
+      "kills": 0,
+      "stress": true,
+      "player": {
+        "hp": 100,
+        "shield": 50,
+        "heat": 0,
+        "overheated": false,
+        "ult": 0,
+        "alive": true,
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "speed": 0
+      },
+      "projectiles": 0,
+      "renderer": {
+        "calls": 231,
+        "triangles": 5822,
+        "geometries": 164,
+        "textures": 34
+      },
+      "canvas": {
+        "clientWidth": 1280,
+        "clientHeight": 720,
+        "width": 1280,
+        "height": 720,
+        "dpr": 1
+      }
+    }
+  },
+  "consoleErrors": [],
+  "pageErrors": []
+}

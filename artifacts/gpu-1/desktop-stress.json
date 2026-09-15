@@ -1,0 +1,120 @@
+{
+  "url": "http://127.0.0.1:5188",
+  "mode": "desktop",
+  "state": "stress",
+  "requestedState": "stress",
+  "appliedState": "stress",
+  "runId": "gpu-1",
+  "seed": 42,
+  "screenshotPath": "artifacts\\gpu-1\\desktop-stress.png",
+  "gpu": {
+    "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x000046A3) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "vendor": "Google Inc. (Intel)",
+    "softwareRendered": false
+  },
+  "result": {
+    "ok": true,
+    "reason": "nonblank",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 720
+    },
+    "drawingBuffer": {
+      "width": 1280,
+      "height": 720
+    },
+    "alphaPixels": 4096,
+    "variance": 255,
+    "colorBuckets": 90,
+    "metrics": {
+      "colorBuckets": 146,
+      "colorEntropyBits": 1.43,
+      "edgeDensity": 0.148,
+      "luminance": {
+        "mean": 12.5,
+        "p5": 0.1,
+        "p95": 55,
+        "contrast": 54.9
+      },
+      "dominantColorShare": 0.825,
+      "nonBackgroundShare": 0.175
+    },
+    "renderBudget": {
+      "tier": "desktop",
+      "note": "starting-point budget; adjust per game and document overrides",
+      "rows": [
+        {
+          "metric": "calls",
+          "actual": 234,
+          "limit": 300,
+          "ok": true
+        },
+        {
+          "metric": "triangles",
+          "actual": 6436,
+          "limit": 750000,
+          "ok": true
+        },
+        {
+          "metric": "geometries",
+          "actual": 169,
+          "limit": 300,
+          "ok": true
+        },
+        {
+          "metric": "textures",
+          "actual": 34,
+          "limit": 60,
+          "ok": true
+        }
+      ],
+      "withinBudget": true
+    },
+    "diagnostics": {
+      "frame": 77,
+      "elapsed": 0,
+      "score": 0,
+      "complete": false,
+      "mode": "play",
+      "wave": 8,
+      "enemies": 120,
+      "combo": 1,
+      "peakCombo": 1,
+      "fps": 60,
+      "kills": 0,
+      "stress": true,
+      "player": {
+        "hp": 100,
+        "shield": 50,
+        "heat": 0,
+        "overheated": false,
+        "ult": 0,
+        "alive": true,
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "speed": 0
+      },
+      "projectiles": 0,
+      "renderer": {
+        "calls": 234,
+        "triangles": 6436,
+        "geometries": 169,
+        "textures": 34
+      },
+      "canvas": {
+        "clientWidth": 1280,
+        "clientHeight": 720,
+        "width": 1280,
+        "height": 720,
+        "dpr": 1
+      }
+    }
+  },
+  "consoleErrors": [],
+  "pageErrors": []
+}
