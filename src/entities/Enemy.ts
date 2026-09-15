@@ -85,6 +85,8 @@ export class Enemy {
   readonly group = new THREE.Group();
   readonly velocity = new THREE.Vector3();
   readonly radius: number;
+  /** Stable per-enemy value in [0,1) — used to break degenerate overlaps. */
+  readonly phase: number;
   hp: number;
   maxHp: number;
   alive = true;
@@ -107,6 +109,7 @@ export class Enemy {
     this.hp = stats.hp;
     this.maxHp = stats.hp;
     this.radius = stats.radius * (stats.kind === 'boss' ? 1 : stats.scale);
+    this.phase = seedPhase % 1;
     this.group.position.copy(position);
     this.fireTimer = stats.fireInterval * 0.4 + seedPhase * 0.3;
   }
@@ -258,6 +261,17 @@ export class Enemy {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Immediate impulse away from the player. `Enemy.update` lerps velocity back
+   * toward its steering target, so this decays into a ~0.3s shove instead of a
+   * permanent speed change.
+   */
+  knockback(dirX: number, dirZ: number, strength: number): void {
+    if (!this.alive) return;
+    const len = Math.hypot(dirX, dirZ) || 1;
+    this.velocity.set((dirX / len) * strength, 0, (dirZ / len) * strength);
   }
 
   hitFlash(): void {

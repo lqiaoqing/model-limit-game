@@ -25,6 +25,16 @@ const ARENA: ArenaBounds = {
   halfDepth: 9,
 };
 
+const PLAYER_RADIUS = 0.55;
+
+/** Contact knockback impulse (m/s) — heavier kinds resist more. */
+const CONTACT_KNOCKBACK: Record<string, number> = {
+  chaser: 11,
+  ranged: 9,
+  elite: 6,
+  boss: 2.5,
+};
+
 const BASE_FOV = 48;
 
 export class Game {
@@ -311,18 +321,37 @@ export class Game {
 
     for (const enemy of this.waves.enemies) {
       if (!enemy.alive) continue;
-      for (const cover of this.covers) {
-        cover.resolveEntity(enemy.group.position, enemy.radius);
-      }
 
       const dx = enemy.group.position.x - this.player.group.position.x;
       const dz = enemy.group.position.z - this.player.group.position.z;
-      const rr = enemy.radius + 0.55;
-      if (dx * dx + dz * dz < rr * rr) {
+      const rr = enemy.radius + PLAYER_RADIUS;
+      const distSq = dx * dx + dz * dz;
+      if (distSq < rr * rr) {
         if (this.player.takeDamage(enemy.stats.contactDamage)) {
           this.lastDeathCause = enemy.stats.kind;
           this.onPlayerHurt();
+          // Shove the attacker back out so it cannot stay glued to the hull.
+          const dist = Math.max(Math.sqrt(distSq), 0.0001);
+          const strength = CONTACT_KNOCKBACK[enemy.stats.kind] ?? 8;
+          enemy.knockback(dx / dist, dz / dist, strength);
         }
+        // Soft separation: an enemy that rests inside the player silhouette is
+        // hidden under the mech at this camera angle, so its damage reads as
+        // coming from nowhere. Keep it on the contact boundary instead.
+        if (distSq > 0.000001) {
+          const dist = Math.sqrt(distSq);
+          const push = (rr - dist) / dist;
+          enemy.group.position.x += dx * push;
+          enemy.group.position.z += dz * push;
+        } else {
+          const a = enemy.phase * Math.PI * 2;
+          enemy.group.position.x = this.player.group.position.x + Math.cos(a) * rr;
+          enemy.group.position.z = this.player.group.position.z + Math.sin(a) * rr;
+        }
+      }
+
+      for (const cover of this.covers) {
+        cover.resolveEntity(enemy.group.position, enemy.radius);
       }
 
       if (enemy.wantShoot && enemy.stats.fireInterval > 0) {
