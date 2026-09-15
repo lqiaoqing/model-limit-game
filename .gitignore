@@ -6,9 +6,8 @@ dist/
 coverage/
 playwright-report/
 test-results/
-# Keep artifacts/ (evidence) but ignore bulky capture dumps if needed
-# artifacts/screens/
-# artifacts/evidence-run/
-# artifacts/premium-1/
-# artifacts/showcase-*/
-# artifacts/gpu-1/
+# Regenerable capture dumps
+artifacts/screens/
+artifacts/screens2/
+artifacts/screens-final/
+artifacts/evidence-run/
