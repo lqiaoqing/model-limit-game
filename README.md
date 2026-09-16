@@ -45,7 +45,7 @@ Press **P** to pause, then toggle:
 | `npm run build` | Typecheck + production bundle → `dist/` |
 | `npm run preview` | Serve production build |
 | `npm run inspect:canvas` | Canvas pixel + render-budget inspection |
-| `npm run test` | Playwright tests (needs browsers installed) |
+| `npm run test` | Playwright tests (desktop uses system Chrome via `channel: 'chrome'`) |
 
 ### Canvas inspector (optional)
 

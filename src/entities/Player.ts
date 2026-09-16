@@ -37,7 +37,7 @@ export const DEFAULT_PLAYER_STATS: PlayerStats = {
   ultChargePerKill: 8,
   ultDamage: 55,
   ultRadius: 7.5,
-  invulnAfterHit: 0.55,
+  invulnAfterHit: 0.65,
 };
 
 export type ArenaBounds = {

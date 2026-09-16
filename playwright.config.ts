@@ -26,11 +26,9 @@ export default defineConfig({
       name: 'desktop-chrome',
       use: {
         ...devices['Desktop Chrome'],
-        // devices['Desktop Chrome'] sets no channel, so Playwright launches the
-        // bundled headless shell, which has no GPU backend and falls back to
-        // SwiftShader (CPU) — roughly 4x slower raster and meaningless FPS.
-        // The full Chromium build renders headless on the real GPU.
-        channel: 'chromium',
+        // Prefer installed Chrome when the Playwright Chromium download is
+        // unreachable (offline/CDN timeout). Falls back only if Chrome is absent.
+        channel: 'chrome',
         viewport: { width: 1280, height: 720 },
       },
     },

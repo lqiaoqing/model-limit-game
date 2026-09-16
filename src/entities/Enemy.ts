@@ -24,7 +24,7 @@ export const ENEMY_TEMPLATES: Record<EnemyKind, EnemyStats> = {
     hp: 28,
     speed: 3.4,
     radius: 0.48,
-    contactDamage: 12,
+    contactDamage: 9,
     projectileDamage: 0,
     fireInterval: 0,
     projectileSpeed: 0,
@@ -38,7 +38,7 @@ export const ENEMY_TEMPLATES: Record<EnemyKind, EnemyStats> = {
     hp: 22,
     speed: 2.1,
     radius: 0.45,
-    contactDamage: 8,
+    contactDamage: 6,
     projectileDamage: 10,
     fireInterval: 1.45,
     projectileSpeed: 11,
@@ -52,7 +52,7 @@ export const ENEMY_TEMPLATES: Record<EnemyKind, EnemyStats> = {
     hp: 90,
     speed: 2.8,
     radius: 0.62,
-    contactDamage: 18,
+    contactDamage: 14,
     projectileDamage: 14,
     fireInterval: 1.1,
     projectileSpeed: 13,
@@ -66,7 +66,7 @@ export const ENEMY_TEMPLATES: Record<EnemyKind, EnemyStats> = {
     hp: 720,
     speed: 1.7,
     radius: 1.15,
-    contactDamage: 28,
+    contactDamage: 20,
     projectileDamage: 16,
     fireInterval: 0.7,
     projectileSpeed: 12,
@@ -95,6 +95,8 @@ export class Enemy {
   telegraphTimer = 0;
   wantShoot = false;
   hitFlashTimer = 0;
+  /** Brief AI freeze after contact knockback so the shove reads as a real stagger. */
+  staggerTimer = 0;
 
   private bossVisual: THREE.Group | null = null;
   private bossRings: THREE.Mesh[] = [];
@@ -175,6 +177,23 @@ export class Enemy {
     if (!this.alive) return;
     this.wantShoot = false;
     this.hitFlashTimer = Math.max(0, this.hitFlashTimer - delta);
+
+    if (this.staggerTimer > 0) {
+      this.staggerTimer = Math.max(0, this.staggerTimer - delta);
+      this.velocity.multiplyScalar(Math.exp(-9 * delta));
+      this.group.position.addScaledVector(this.velocity, delta);
+      this.group.position.x = THREE.MathUtils.clamp(
+        this.group.position.x,
+        -bounds.halfWidth + this.radius,
+        bounds.halfWidth - this.radius,
+      );
+      this.group.position.z = THREE.MathUtils.clamp(
+        this.group.position.z,
+        -bounds.halfDepth + this.radius,
+        bounds.halfDepth - this.radius,
+      );
+      return;
+    }
 
     const toPlayer = new THREE.Vector3(
       playerPos.x - this.group.position.x,
@@ -268,10 +287,11 @@ export class Enemy {
    * toward its steering target, so this decays into a ~0.3s shove instead of a
    * permanent speed change.
    */
-  knockback(dirX: number, dirZ: number, strength: number): void {
+  knockback(dirX: number, dirZ: number, strength: number, stagger = 0): void {
     if (!this.alive) return;
     const len = Math.hypot(dirX, dirZ) || 1;
     this.velocity.set((dirX / len) * strength, 0, (dirZ / len) * strength);
+    if (stagger > 0) this.staggerTimer = Math.max(this.staggerTimer, stagger);
   }
 
   hitFlash(): void {

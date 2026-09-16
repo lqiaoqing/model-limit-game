@@ -25,12 +25,16 @@ Procedural-only (no Tripo/Gemini/ElevenLabs keys on this machine).
 - [x] Procedural visuals + VFX + camera shake
 - [x] `npm run build` pass
 - [x] Screenshots + diagnostics (`artifacts/screens-final`, `final-evidence.md`)
+- [x] Contact-damage fairness pass (soft separation + knockback + batch capacity 400)
+- [x] Combat feel pass (enemy-enemy spatial separation, contact DPS cut, stagger, contact sparks)
+- [x] Bot playtest under `@playwright/test` (`tests/bot-playtest.spec.ts`: combat, stress death, restart, pause)
 
 ## Pending
-- Optional: player-facing stress toggle
-- Optional: bot playtest once chromium installs
+- Optional: player-facing stress toggle polish
 - Optional: external 3D/image/audio when API keys exist
+- Optional: mobile WebKit regression (`npx playwright install webkit`)
 
 ## Next
 Play at http://127.0.0.1:5188/ and tune feel/difficulty from real play.
+Playwright desktop uses `channel: 'chrome'` (system Chrome) because the CDN Chromium download timed out on this machine.
 

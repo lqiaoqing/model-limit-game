@@ -29,11 +29,17 @@ const PLAYER_RADIUS = 0.55;
 
 /** Contact knockback impulse (m/s) — heavier kinds resist more. */
 const CONTACT_KNOCKBACK: Record<string, number> = {
-  chaser: 11,
-  ranged: 9,
-  elite: 6,
-  boss: 2.5,
+  chaser: 12,
+  ranged: 10,
+  elite: 7,
+  boss: 2.8,
 };
+
+/** How long an enemy freezes AI after a contact shove (reads as stagger). */
+const CONTACT_STAGGER = 0.24;
+
+/** Spatial-hash cell size for enemy-enemy separation (covers 2× largest common radius). */
+const ENEMY_SEP_CELL = 2.4;
 
 const BASE_FOV = 48;
 
@@ -123,7 +129,7 @@ export class Game {
     this.vfx = new VfxSystem(this.scene, () => this.rng());
     this.worldFx = new WorldFx(this.scene, () => this.rng(), ARENA);
     this.decals = new GroundDecals(this.scene, 48);
-    this.enemyBatch = new EnemyBatchRenderer(this.scene, 220);
+    this.enemyBatch = new EnemyBatchRenderer(this.scene, 400);
     this.projectiles = new ProjectilePool(this.scene, 200);
     this.waves = new WaveDirector(this.scene, ARENA, () => this.rng());
 
@@ -301,6 +307,7 @@ export class Game {
     }
 
     this.waves.update(delta, this.player.group.position, elapsed);
+    this.separateEnemies();
     this.enemyBatch.sync(this.waves.enemies);
     const state = this.waves.getState();
     if (state.wave !== this.lastWaveShown) {
@@ -333,7 +340,17 @@ export class Game {
           // Shove the attacker back out so it cannot stay glued to the hull.
           const dist = Math.max(Math.sqrt(distSq), 0.0001);
           const strength = CONTACT_KNOCKBACK[enemy.stats.kind] ?? 8;
-          enemy.knockback(dx / dist, dz / dist, strength);
+          enemy.knockback(dx / dist, dz / dist, strength, CONTACT_STAGGER);
+          this.vfx.spawnBurst(
+            new THREE.Vector3(
+              (enemy.group.position.x + this.player.group.position.x) * 0.5,
+              0.45,
+              (enemy.group.position.z + this.player.group.position.z) * 0.5,
+            ),
+            '#ff8fa3',
+            5,
+            4,
+          );
         }
         // Soft separation: an enemy that rests inside the player silhouette is
         // hidden under the mech at this camera angle, so its damage reads as
@@ -407,6 +424,89 @@ export class Game {
         this.collectPickup(pickup);
       }
     }
+  }
+
+  /**
+   * Soft-separate overlapping enemies so packs cannot form a single blob
+   * (one hitbox + unreadable silhouette + stacked shove pressure).
+   * Spatial hash keeps stress-wave counts O(n) instead of O(n²).
+   */
+  private separateEnemies(): void {
+    const enemies = this.waves.enemies;
+    let count = 0;
+    for (const e of enemies) if (e.alive) count += 1;
+    if (count < 2) return;
+
+    const cell = ENEMY_SEP_CELL;
+    const grid = new Map<number, number[]>();
+    const aliveIdx: number[] = [];
+    for (let i = 0; i < enemies.length; i += 1) {
+      if (!enemies[i].alive) continue;
+      aliveIdx.push(i);
+      const p = enemies[i].group.position;
+      const key = this.hashCell(Math.floor(p.x / cell), Math.floor(p.z / cell));
+      let bucket = grid.get(key);
+      if (!bucket) {
+        bucket = [];
+        grid.set(key, bucket);
+      }
+      bucket.push(i);
+    }
+
+    for (let a = 0; a < aliveIdx.length; a += 1) {
+      const ia = aliveIdx[a];
+      const ea = enemies[ia];
+      const cx0 = Math.floor(ea.group.position.x / cell);
+      const cz0 = Math.floor(ea.group.position.z / cell);
+      for (let ox = -1; ox <= 1; ox += 1) {
+        for (let oz = -1; oz <= 1; oz += 1) {
+          const bucket = grid.get(this.hashCell(cx0 + ox, cz0 + oz));
+          if (!bucket) continue;
+          for (const ib of bucket) {
+            if (ib <= ia) continue;
+            const eb = enemies[ib];
+            if (!eb.alive) continue;
+            const rr = ea.radius + eb.radius;
+            const dx = eb.group.position.x - ea.group.position.x;
+            const dz = eb.group.position.z - ea.group.position.z;
+            const distSq = dx * dx + dz * dz;
+            if (distSq >= rr * rr) continue;
+            if (distSq < 1e-8) {
+              const ang = (ea.phase + eb.phase) * Math.PI;
+              const half = rr * 0.5;
+              const mx = ea.group.position.x;
+              const mz = ea.group.position.z;
+              ea.group.position.x = mx - Math.cos(ang) * half;
+              ea.group.position.z = mz - Math.sin(ang) * half;
+              eb.group.position.x = mx + Math.cos(ang) * half;
+              eb.group.position.z = mz + Math.sin(ang) * half;
+              continue;
+            }
+            const dist = Math.sqrt(distSq);
+            const push = ((rr - dist) / dist) * 0.5;
+            ea.group.position.x -= dx * push;
+            ea.group.position.z -= dz * push;
+            eb.group.position.x += dx * push;
+            eb.group.position.z += dz * push;
+          }
+        }
+      }
+      ea.group.position.x = THREE.MathUtils.clamp(
+        ea.group.position.x,
+        -ARENA.halfWidth + ea.radius,
+        ARENA.halfWidth - ea.radius,
+      );
+      ea.group.position.z = THREE.MathUtils.clamp(
+        ea.group.position.z,
+        -ARENA.halfDepth + ea.radius,
+        ARENA.halfDepth - ea.radius,
+      );
+    }
+  }
+
+  private hashCell(cx: number, cz: number): number {
+    // Pack two 16-bit-ish cell coords into one number key.
+    return (cx + 512) * 1024 + (cz + 512);
   }
 
   private resolveProjectileHits(): void {
