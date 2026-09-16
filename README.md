@@ -26,6 +26,7 @@ Open **http://127.0.0.1:5188/**
 | Ultimate | Q (when ring is full) |
 | Pause | P |
 | Restart | R |
+| Pick retrofit | 1 / 2 / 3 (or click) after clearing a wave |
 | Mobile | Left stick + DASH / ULT (auto-fire when stick moves) |
 
 ### Stress / Low Graphics

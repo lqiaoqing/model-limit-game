@@ -22,6 +22,7 @@ declare global {
       fps?: number;
       kills?: number;
       stress?: boolean;
+      upgradeStacks?: Record<string, number>;
       targetScore?: number;
       projectiles?: number;
       player: {

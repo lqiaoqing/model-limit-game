@@ -114,6 +114,18 @@ test('bot playtest: combat progression, stress death, restart', async ({ page },
     for (const key of keys) await page.keyboard.up(key);
 
     const snap = await sample(page);
+    if (snap.mode === 'upgrade') {
+      await page.keyboard.press('Digit1');
+      await page.waitForTimeout(250);
+      const resumed = await sample(page);
+      expect(resumed.mode, 'upgrade pick resumes play').toBe('play');
+      distance += Math.hypot(resumed.x - prevX, resumed.z - prevZ);
+      prevX = resumed.x;
+      prevZ = resumed.z;
+      maxKills = Math.max(maxKills, resumed.kills);
+      maxScore = Math.max(maxScore, resumed.score);
+      continue;
+    }
     distance += Math.hypot(snap.x - prevX, snap.z - prevZ);
     prevX = snap.x;
     prevZ = snap.z;
@@ -124,7 +136,12 @@ test('bot playtest: combat progression, stress death, restart', async ({ page },
 
   await page.mouse.up();
 
-  const combat = await sample(page);
+  let combat = await sample(page);
+  if (combat.mode === 'upgrade') {
+    await page.keyboard.press('Digit1');
+    await page.waitForTimeout(250);
+    combat = await sample(page);
+  }
   const combatReport = {
     dashes: dashCount,
     kills: maxKills,

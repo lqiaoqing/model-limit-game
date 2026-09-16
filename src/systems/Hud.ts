@@ -15,12 +15,19 @@ export type HudSnapshot = {
   status: string;
   boss: { visible: boolean; hpRatio: number; name: string };
   waveBanner: string | null;
-  mode: 'play' | 'paused' | 'dead';
+  mode: 'play' | 'paused' | 'dead' | 'upgrade';
   peakCombo: number;
   kills: number;
   deathCause: string;
   stress: boolean;
   lowGraphics: boolean;
+};
+
+export type UpgradeCardView = {
+  name: string;
+  desc: string;
+  color: string;
+  stackLabel: string;
 };
 
 export class Hud {
@@ -62,6 +69,9 @@ export class Hud {
     perfCalls: this.el('#perf-calls'),
     perfTris: this.el('#perf-tris'),
     perfFoes: this.el('#perf-foes'),
+    upgradePanel: this.el('#upgrade-panel'),
+    upgradeCards: this.el('#upgrade-cards'),
+    upgradeTitle: this.el('#upgrade-title'),
   };
 
   private waveBannerTimer = 0;
@@ -70,6 +80,7 @@ export class Hud {
   private onSecondary: () => void = () => undefined;
   private onStress: (on: boolean) => void = () => undefined;
   private onGraphics: (low: boolean) => void = () => undefined;
+  private onUpgradePick: (index: number) => void = () => undefined;
 
   constructor() {
     this.els.overlayPrimary.addEventListener('click', () => this.onPrimary());
@@ -96,6 +107,41 @@ export class Hud {
 
   setGraphicsHandler(handler: (low: boolean) => void): void {
     this.onGraphics = handler;
+  }
+
+  setUpgradePickHandler(handler: (index: number) => void): void {
+    this.onUpgradePick = handler;
+  }
+
+  showUpgradeCards(cards: UpgradeCardView[], wave: number): void {
+    this.els.upgradeTitle.textContent = `WAVE ${wave} · SELECT RETROFIT`;
+    this.els.upgradeCards.innerHTML = '';
+    cards.forEach((card, index) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'upgrade-card';
+      btn.style.setProperty('--card-accent', card.color);
+      btn.innerHTML = `
+        <span class="key">${index + 1}</span>
+        <h3></h3>
+        <p></p>
+        <span class="stack"></span>
+      `;
+      const title = btn.querySelector('h3');
+      const desc = btn.querySelector('p');
+      const stack = btn.querySelector('.stack');
+      if (title) title.textContent = card.name;
+      if (desc) desc.textContent = card.desc;
+      if (stack) stack.textContent = card.stackLabel;
+      btn.addEventListener('click', () => this.onUpgradePick(index));
+      this.els.upgradeCards.appendChild(btn);
+    });
+    this.els.upgradePanel.classList.remove('hidden');
+  }
+
+  hideUpgradeCards(): void {
+    this.els.upgradePanel.classList.add('hidden');
+    this.els.upgradeCards.innerHTML = '';
   }
 
   setStressVisible(on: boolean): void {
@@ -226,7 +272,11 @@ export class Hud {
 
     if (snapshot.mode === 'play') {
       els.overlay.classList.add('hidden');
+      this.hideUpgradeCards();
+    } else if (snapshot.mode === 'upgrade') {
+      els.overlay.classList.add('hidden');
     } else {
+      this.hideUpgradeCards();
       els.overlay.classList.remove('hidden');
       if (snapshot.mode === 'paused') {
         els.overlayTitle.textContent = snapshot.stress ? 'PAUSED · STRESS' : 'PAUSED';

@@ -8,6 +8,8 @@ export type InputFrame = {
   ultPressed: boolean;
   pausePressed: boolean;
   restartPressed: boolean;
+  /** 0/1/2 when Digit1/2/3 pressed this frame; -1 otherwise. */
+  upgradeChoice: number;
 };
 
 type PointerState = {
@@ -34,6 +36,7 @@ export class InputController {
   private ultQueued = false;
   private pauseQueued = false;
   private restartQueued = false;
+  private upgradeQueued = -1;
   private fireHeld = false;
   private pointerAimActive = false;
   private readonly raycaster = new THREE.Raycaster();
@@ -49,6 +52,9 @@ export class InputController {
     if (event.code === 'KeyQ') this.ultQueued = true;
     if (event.code === 'KeyP' || event.code === 'Escape') this.pauseQueued = true;
     if (event.code === 'KeyR') this.restartQueued = true;
+    if (event.code === 'Digit1' || event.code === 'Numpad1') this.upgradeQueued = 0;
+    if (event.code === 'Digit2' || event.code === 'Numpad2') this.upgradeQueued = 1;
+    if (event.code === 'Digit3' || event.code === 'Numpad3') this.upgradeQueued = 2;
   };
 
   private readonly onKeyUp = (event: KeyboardEvent) => {
@@ -148,11 +154,13 @@ export class InputController {
     frame.ultPressed = this.ultQueued;
     frame.pausePressed = this.pauseQueued;
     frame.restartPressed = this.restartQueued;
+    frame.upgradeChoice = this.upgradeQueued;
 
     this.dashQueued = false;
     this.ultQueued = false;
     this.pauseQueued = false;
     this.restartQueued = false;
+    this.upgradeQueued = -1;
     return frame;
   }
 

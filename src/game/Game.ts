@@ -18,6 +18,12 @@ import { WaveDirector } from '../systems/WaveDirector';
 import { DebugTools, type DebugTuning } from '../systems/DebugTools';
 import { EnemyBatchRenderer } from '../systems/EnemyBatchRenderer';
 import { disposeEnemyAssets } from '../systems/EnemyAssets';
+import {
+  getUpgrade,
+  rollUpgradeOffers,
+  type UpgradeId,
+  type UpgradeOffer,
+} from '../systems/UpgradePool';
 import { createSeededRandom } from '../utils/random';
 
 const ARENA: ArenaBounds = {
@@ -87,6 +93,7 @@ export class Game {
     ultPressed: false,
     pausePressed: false,
     restartPressed: false,
+    upgradeChoice: -1,
   };
 
   private readonly tmp = {
@@ -102,7 +109,7 @@ export class Game {
   private combo = 1;
   private peakCombo = 1;
   private comboTimer = 0;
-  private mode: 'play' | 'paused' | 'dead' = 'play';
+  private mode: 'play' | 'paused' | 'dead' | 'upgrade' = 'play';
   private rng = createSeededRandom(1);
   private pausedForScreenshot = false;
   private reducedMotion = false;
@@ -118,6 +125,8 @@ export class Game {
   private pickupChainTimer = 0;
   private crosshairEl: HTMLElement | null = null;
   private readonly ndc = new THREE.Vector2();
+  private upgradeStacks: Partial<Record<UpgradeId, number>> = {};
+  private upgradeOffers: UpgradeOffer[] = [];
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = createRenderer(canvas);
@@ -150,6 +159,7 @@ export class Game {
     );
     this.hud.setStressHandler((on) => this.setStressMode(on));
     this.hud.setGraphicsHandler((low) => this.setLowGraphics(low));
+    this.hud.setUpgradePickHandler((index) => this.applyUpgrade(index));
 
     this.createScene();
     this.installTestHooks();
@@ -206,7 +216,11 @@ export class Game {
       this.restart();
       return;
     }
-    if (this.inputFrame.pausePressed && this.mode !== 'dead') {
+    if (this.mode === 'upgrade') {
+      if (this.inputFrame.upgradeChoice >= 0) {
+        this.applyUpgrade(this.inputFrame.upgradeChoice);
+      }
+    } else if (this.inputFrame.pausePressed && this.mode !== 'dead') {
       this.mode = this.mode === 'paused' ? 'play' : 'paused';
     }
 
@@ -307,6 +321,11 @@ export class Game {
     }
 
     this.waves.update(delta, this.player.group.position, elapsed);
+    if (!this.stressMode && this.lastWaveShown >= 1 && this.waves.wave > this.lastWaveShown) {
+      this.openUpgrade();
+      this.enemyBatch.sync(this.waves.enemies);
+      return;
+    }
     this.separateEnemies();
     this.enemyBatch.sync(this.waves.enemies);
     const state = this.waves.getState();
@@ -729,6 +748,45 @@ export class Game {
     this.syncPostSize();
   }
 
+  private openUpgrade(): void {
+    this.upgradeOffers = rollUpgradeOffers(this.upgradeStacks, () => this.rng());
+    if (this.upgradeOffers.length === 0) return;
+    this.mode = 'upgrade';
+    this.hud.showUpgradeCards(
+      this.upgradeOffers.map((offer) => {
+        const stack = this.upgradeStacks[offer.id] ?? 0;
+        return {
+          name: offer.name,
+          desc: offer.desc,
+          color: offer.color,
+          stackLabel: `Stack ${stack} → ${stack + 1}`,
+        };
+      }),
+      this.waves.wave,
+    );
+    this.audio.wave();
+  }
+
+  private applyUpgrade(index: number): void {
+    if (this.mode !== 'upgrade') return;
+    const offer = this.upgradeOffers[index];
+    if (!offer) return;
+    const def = getUpgrade(offer.id);
+    if (!def) return;
+    def.apply(this.player.stats);
+    this.upgradeStacks[offer.id] = (this.upgradeStacks[offer.id] ?? 0) + 1;
+    if (offer.id === 'armor') this.player.heal(20);
+    if (offer.id === 'shield_bank') this.player.addShield(15);
+    this.hud.flashPickup(offer.name.toUpperCase(), offer.color);
+    this.hud.pushKillFeed(`MOD · ${offer.name}`, 'ranged');
+    this.audio.pickupChain(1);
+    this.feel.triggerFovPunch(1.6);
+    this.upgradeOffers = [];
+    this.hud.hideUpgradeCards();
+    this.mode = 'play';
+    this.publishDiagnostics();
+  }
+
   private restart(): void {
     this.score = 0;
     this.elapsed = 0;
@@ -742,6 +800,9 @@ export class Game {
     this.mode = 'play';
     this.lastWaveShown = 0;
     this.rng = createSeededRandom(1);
+    this.upgradeStacks = {};
+    this.upgradeOffers = [];
+    this.hud.hideUpgradeCards();
     this.feel.reset();
     this.player.reset();
     this.player.stats = { ...DEFAULT_PLAYER_STATS, moveSpeed: this.tuning.speed };
@@ -1347,15 +1408,17 @@ export class Game {
     const status =
       this.mode === 'dead'
         ? 'Systems offline'
-        : this.player.overheated
-          ? 'Cooling weapon'
-          : boss
-            ? 'Destroy the Siege Core'
-            : this.stressMode
-              ? 'STRESS: hold the line'
-              : waveState.intermission > 0
-                ? 'Next wave inbound'
-                : 'Hold the arena';
+        : this.mode === 'upgrade'
+          ? 'Select a retrofit module'
+          : this.player.overheated
+            ? 'Cooling weapon'
+            : boss
+              ? 'Destroy the Siege Core'
+              : this.stressMode
+                ? 'STRESS: hold the line'
+                : waveState.intermission > 0
+                  ? 'Next wave inbound'
+                  : 'Hold the arena';
 
     this.hud.update(
       {
@@ -1457,6 +1520,7 @@ export class Game {
       fps: this.fps,
       kills: this.kills,
       stress: this.stressMode,
+      upgradeStacks: { ...this.upgradeStacks },
       player: {
         hp: this.player.hp,
         shield: this.player.shield,

@@ -28,6 +28,7 @@ Procedural-only (no Tripo/Gemini/ElevenLabs keys on this machine).
 - [x] Contact-damage fairness pass (soft separation + knockback + batch capacity 400)
 - [x] Combat feel pass (enemy-enemy spatial separation, contact DPS cut, stagger, contact sparks)
 - [x] Bot playtest under `@playwright/test` (`tests/bot-playtest.spec.ts`: combat, stress death, restart, pause)
+- [x] Wave-clear retrofit picker: 3-choice upgrades that scale player stats between waves
 
 ## Pending
 - Optional: player-facing stress toggle polish
@@ -37,4 +38,5 @@ Procedural-only (no Tripo/Gemini/ElevenLabs keys on this machine).
 ## Next
 Play at http://127.0.0.1:5188/ and tune feel/difficulty from real play.
 Playwright desktop uses `channel: 'chrome'` (system Chrome) because the CDN Chromium download timed out on this machine.
+Upgrade pool lives in `src/systems/UpgradePool.ts`; pick with 1/2/3 or click. Stress mode skips the picker.
 
