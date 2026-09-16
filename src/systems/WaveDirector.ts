@@ -221,6 +221,8 @@ export class WaveDirector {
       scale: template.scale * (1 + formTier * 0.08),
     };
     const enemy = new Enemy(stats, new THREE.Vector3(x, 0, z), this.rng(), formTier);
+    // Spawn anticipation: flash the foot ring so new packs read as incoming.
+    enemy.telegraphTimer = 0.45;
     this.enemies.push(enemy);
     this.scene.add(enemy.group);
     this.spawnedThisWave += 1;

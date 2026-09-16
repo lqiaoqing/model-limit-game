@@ -30,14 +30,13 @@ Procedural-only (no Tripo/Gemini/ElevenLabs keys on this machine).
 - [x] Bot playtest under `@playwright/test` (`tests/bot-playtest.spec.ts`: combat, stress death, restart, pause)
 - [x] Wave-clear retrofit picker: 3-choice upgrades that scale player stats between waves
 - [x] Dual form evolution: player mech tiers by retrofit stacks; enemy tiers only at boss milestones (waves 6/11/16) with one-shot stat steps — no per-wave HP creep
+- [x] P1 graphics pass: contrast 54→71, entropy 1.4→3.3; hazard chevrons + medallion; stress capture draws 120 foes; scorecard `artifacts/scorecard-p1.md` avg 3.0
 
 ## Pending
-- Optional: player-facing stress toggle polish
+- Optional: mobile draw call ≤150 + WebKit regression (P2)
 - Optional: external 3D/image/audio when API keys exist
-- Optional: mobile WebKit regression (`npx playwright install webkit`)
+- Optional: heat-as-resource weapon modes
 
 ## Next
-Play at http://127.0.0.1:5188/ and tune feel/difficulty from real play.
-Playwright desktop uses `channel: 'chrome'` (system Chrome) because the CDN Chromium download timed out on this machine.
-Upgrade pool lives in `src/systems/UpgradePool.ts`; pick with 1/2/3 or click. Stress mode skips the picker.
+P2 mobile budget, or playtest tuning at http://127.0.0.1:5188/
 

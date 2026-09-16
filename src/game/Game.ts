@@ -81,7 +81,7 @@ export class Game {
     dashMultiplier: 1,
     acceleration: 14,
     cameraLag: 0.12,
-    exposure: 1.18,
+    exposure: 1.34,
     maxDpr: 2,
   };
 
@@ -745,8 +745,11 @@ export class Game {
     if (on) {
       this.waves.wave = Math.max(this.waves.wave, 8);
       this.lastWaveShown = 0;
+      this.lastEnemyFormTier = enemyFormTierForWave(this.waves.wave);
       this.player.invulnTimer = 3;
       this.waves.forceStartWave(this.player.group.position);
+      // Ensure instances exist even if the next frame is a screenshot freeze.
+      this.enemyBatch.sync(this.waves.enemies);
     }
   }
 
@@ -908,15 +911,16 @@ export class Game {
   }
 
   private createScene(): void {
-    this.scene.background = new THREE.Color('#05070b');
-    this.scene.fog = new THREE.FogExp2('#05070b', 0.028);
+    this.scene.background = new THREE.Color('#070b12');
+    // Lighter fog keeps mid-ground props readable while still framing the arena.
+    this.scene.fog = new THREE.FogExp2('#070b12', 0.016);
 
     // Cool ambient + warm key + cyan rim — cold/warm split
-    const hemisphere = new THREE.HemisphereLight('#9db7d9', '#1a1410', 0.85);
+    const hemisphere = new THREE.HemisphereLight('#b7c9e4', '#241810', 1.15);
     this.hemiLight = hemisphere;
     this.scene.add(hemisphere);
 
-    const sun = new THREE.DirectionalLight('#ffd7a8', 2.8);
+    const sun = new THREE.DirectionalLight('#ffd7a8', 3.6);
     sun.position.set(-8, 16, 6);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -929,14 +933,20 @@ export class Game {
     sun.shadow.bias = -0.0004;
     this.scene.add(sun);
 
-    const fill = new THREE.DirectionalLight('#5ec8ff', 0.45);
+    const fill = new THREE.DirectionalLight('#5ec8ff', 0.85);
     this.fillLight = fill;
     fill.position.set(10, 5, -8);
     this.scene.add(fill);
 
-    const rim = new THREE.DirectionalLight('#22d3ee', 0.35);
+    const rim = new THREE.DirectionalLight('#22d3ee', 0.7);
     rim.position.set(0, 3, 12);
     this.scene.add(rim);
+
+    // Soft bounce from the arena floor — lifts cover/player undersides.
+    const bounce = new THREE.DirectionalLight('#7dd3fc', 0.35);
+    bounce.position.set(0, -2, 0);
+    bounce.castShadow = false;
+    this.scene.add(bounce);
 
     this.scene.add(this.createArena());
     this.scene.add(this.createSkyline());
@@ -1195,11 +1205,11 @@ export class Game {
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(ARENA.halfWidth * 2, ARENA.halfDepth * 2, 1, 1),
       new THREE.MeshStandardMaterial({
-        color: '#151a22',
+        color: '#1c2433',
         map: floorTexture,
         roughnessMap: roughTex,
-        roughness: 1,
-        metalness: 0.12,
+        roughness: 0.92,
+        metalness: 0.18,
       }),
     );
     floor.rotation.x = -Math.PI / 2;
@@ -1257,14 +1267,81 @@ export class Game {
     s4.position.set(ARENA.halfWidth + 0.2, 0.56, 0);
     arena.add(s1, s2, s3, s4);
 
-    const marker = new THREE.Mesh(
-      new THREE.RingGeometry(1.2, 1.35, 6),
-      new THREE.MeshBasicMaterial({ color: '#22d3ee', transparent: true, opacity: 0.35 }),
+    // Arena medallion: layered rings + hex — art-direction focal point.
+    const medallion = new THREE.Group();
+    const ringA = new THREE.Mesh(
+      new THREE.RingGeometry(1.55, 1.72, 6),
+      new THREE.MeshBasicMaterial({
+        color: '#22d3ee',
+        transparent: true,
+        opacity: 0.4,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
     );
-    marker.rotation.x = -Math.PI / 2;
-    marker.rotation.z = Math.PI / 6;
-    marker.position.y = 0.025;
-    arena.add(marker);
+    ringA.rotation.x = -Math.PI / 2;
+    ringA.rotation.z = Math.PI / 6;
+    ringA.position.y = 0.02;
+    const ringB = new THREE.Mesh(
+      new THREE.RingGeometry(1.95, 2.05, 48),
+      new THREE.MeshBasicMaterial({
+        color: '#7ae7ff',
+        transparent: true,
+        opacity: 0.25,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    );
+    ringB.rotation.x = -Math.PI / 2;
+    ringB.position.y = 0.018;
+    const core = new THREE.Mesh(
+      new THREE.CircleGeometry(0.55, 6),
+      new THREE.MeshBasicMaterial({
+        color: '#22d3ee',
+        transparent: true,
+        opacity: 0.14,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    );
+    core.rotation.x = -Math.PI / 2;
+    core.rotation.z = Math.PI / 6;
+    core.position.y = 0.016;
+    medallion.add(ringA, ringB, core);
+    arena.add(medallion);
+
+    // Perimeter hazard chevrons — arena identity at the rail line.
+    const chevGeo = new THREE.BoxGeometry(0.55, 0.06, 0.14);
+    const chevMat = new THREE.MeshBasicMaterial({
+      color: '#fbbf24',
+      transparent: true,
+      opacity: 0.55,
+    });
+    const chevCount = 36;
+    const chevs = new THREE.InstancedMesh(chevGeo, chevMat, chevCount);
+    chevs.frustumCulled = false;
+    {
+      const dummy = new THREE.Object3D();
+      let i = 0;
+      const place = (x: number, z: number, rotY: number) => {
+        dummy.position.set(x, 0.03, z);
+        dummy.rotation.set(0, rotY, 0);
+        dummy.updateMatrix();
+        chevs.setMatrixAt(i, dummy.matrix);
+        i += 1;
+      };
+      const spanX = ARENA.halfWidth - 0.4;
+      const spanZ = ARENA.halfDepth - 0.4;
+      for (let k = 0; k < 9; k += 1) {
+        const t = (k / 8) * 2 - 1;
+        place(t * spanX, -spanZ, 0);
+        place(t * spanX, spanZ, Math.PI);
+        place(-spanX, t * spanZ, Math.PI / 2);
+        place(spanX, t * spanZ, -Math.PI / 2);
+      }
+      chevs.instanceMatrix.needsUpdate = true;
+    }
+    arena.add(chevs);
 
     const pylonGeo = new THREE.CylinderGeometry(0.25, 0.35, 2.2, 6);
     const pylonMat = new THREE.MeshStandardMaterial({
@@ -1511,6 +1588,8 @@ export class Game {
           this.setStressMode(true);
           this.restart();
           this.setStressMode(true);
+          this.enemyBatch.sync(this.waves.enemies);
+          this.pushHud(0);
         }
         this.render();
         this.publishDiagnostics();

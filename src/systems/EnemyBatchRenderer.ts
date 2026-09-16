@@ -84,9 +84,12 @@ export class EnemyBatchRenderer {
       this.dummy.updateMatrix();
       batch.foot.setMatrixAt(idx, this.dummy.matrix);
 
-      // Telegraph flash via instance color on foot
-      const flash = enemy.telegraphTimer > 0 ? 1 : 0.55 + enemy.formTier * 0.08;
-      this.color.setRGB(flash, flash * 0.6, flash * 0.6);
+      // Telegraph flash + form-tier emphasis on foot ring
+      const flash =
+        enemy.telegraphTimer > 0
+          ? 1.15
+          : 0.55 + enemy.formTier * 0.12;
+      this.color.setRGB(flash, flash * (enemy.telegraphTimer > 0 ? 0.35 : 0.6), flash * 0.35);
       batch.foot.setColorAt(idx, this.color);
 
       batch.count += 1;

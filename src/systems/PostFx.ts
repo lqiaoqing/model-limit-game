@@ -21,7 +21,7 @@ export class PostFx {
     try {
       const composer = new EffectComposer(this.renderer);
       composer.addPass(new RenderPass(this.scene, this.camera));
-      const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.38, 0.55, 0.88);
+      const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.42, 0.5, 0.82);
       composer.addPass(bloom);
       composer.addPass(new OutputPass());
       this.composer = composer;
