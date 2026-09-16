@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { getEnemyAssets } from '../systems/EnemyAssets';
 
 export type EnemyKind = 'chaser' | 'ranged' | 'elite' | 'boss';
+export type EnemyFormTier = 0 | 1 | 2 | 3;
 
 export type EnemyStats = {
   kind: EnemyKind;
@@ -97,6 +98,8 @@ export class Enemy {
   hitFlashTimer = 0;
   /** Brief AI freeze after contact knockback so the shove reads as a real stagger. */
   staggerTimer = 0;
+  /** Visual/stat form unlocked by wave progression. */
+  readonly formTier: EnemyFormTier;
 
   private bossVisual: THREE.Group | null = null;
   private bossRings: THREE.Mesh[] = [];
@@ -107,7 +110,9 @@ export class Enemy {
     readonly stats: EnemyStats,
     position: THREE.Vector3,
     private readonly seedPhase: number,
+    formTier: EnemyFormTier = 0,
   ) {
+    this.formTier = formTier;
     this.hp = stats.hp;
     this.maxHp = stats.hp;
     this.radius = stats.radius * (stats.kind === 'boss' ? 1 : stats.scale);
@@ -155,6 +160,8 @@ export class Enemy {
       g.add(pod);
     }
     g.position.y = 0;
+    const formScale = 1 + this.formTier * 0.12;
+    g.scale.setScalar(formScale);
     this.group.add(g);
     this.bossVisual = g;
     scene.add(this.group);

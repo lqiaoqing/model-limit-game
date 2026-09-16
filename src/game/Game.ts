@@ -24,6 +24,7 @@ import {
   type UpgradeId,
   type UpgradeOffer,
 } from '../systems/UpgradePool';
+import { enemyFormTierForWave } from '../systems/EnemyAssets';
 import { createSeededRandom } from '../utils/random';
 
 const ARENA: ArenaBounds = {
@@ -784,7 +785,22 @@ export class Game {
     this.upgradeOffers = [];
     this.hud.hideUpgradeCards();
     this.mode = 'play';
+    this.refreshPlayerForm();
     this.publishDiagnostics();
+  }
+
+  private refreshPlayerForm(): void {
+    const stacks = this.upgradeStacks;
+    const total = Object.values(stacks).reduce((sum, n) => sum + (n ?? 0), 0);
+    const weapon =
+      (stacks.overclock ?? 0) + (stacks.he_rounds ?? 0) + (stacks.mag_accel ?? 0);
+    const defense =
+      (stacks.armor ?? 0) + (stacks.shield_bank ?? 0) + (stacks.reactive_plating ?? 0);
+    let tier = 0;
+    if (total >= 12) tier = 3;
+    else if (total >= 7) tier = 2;
+    else if (total >= 3) tier = 1;
+    this.player.setFormTier(tier, { weapon, defense, total });
   }
 
   private restart(): void {
@@ -806,6 +822,7 @@ export class Game {
     this.feel.reset();
     this.player.reset();
     this.player.stats = { ...DEFAULT_PLAYER_STATS, moveSpeed: this.tuning.speed };
+    this.player.setFormTier(0);
     this.projectiles.clear();
     this.vfx.reset();
     this.worldFx.reset();
@@ -1501,6 +1518,10 @@ export class Game {
         this.debugTools.setHidden(hidden);
         this.hud.setPerfVisible(!hidden);
       },
+      pickUpgrade: (index: number) => {
+        this.applyUpgrade(index);
+        return { mode: this.mode };
+      },
     };
   }
 
@@ -1521,6 +1542,8 @@ export class Game {
       kills: this.kills,
       stress: this.stressMode,
       upgradeStacks: { ...this.upgradeStacks },
+      playerFormTier: this.player.getFormTier(),
+      enemyFormTier: enemyFormTierForWave(waveState.wave),
       player: {
         hp: this.player.hp,
         shield: this.player.shield,

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { Enemy, ENEMY_TEMPLATES, type EnemyKind } from '../entities/Enemy';
+import { Enemy, ENEMY_TEMPLATES, type EnemyKind, type EnemyFormTier, type EnemyStats } from '../entities/Enemy';
+import { enemyFormTierForWave } from './EnemyAssets';
 
 export type WaveState = {
   wave: number;
@@ -201,9 +202,22 @@ export class WaveDirector {
     }
 
     // Scale HP slightly with wave (not in stress dump for readability)
+    const formTier: EnemyFormTier = enemyFormTierForWave(this.wave);
     const scaleHp = this.stressMode ? 1 : 1 + (this.wave - 1) * 0.06;
-    const stats = { ...template, hp: Math.round(template.hp * scaleHp) };
-    const enemy = new Enemy(stats, new THREE.Vector3(x, 0, z), this.rng());
+    const formMul = 1 + formTier * 0.28;
+    const dmgMul = 1 + formTier * 0.14;
+    const speedMul = 1 + formTier * 0.05;
+    const radiusMul = 1 + formTier * 0.06;
+    const stats: EnemyStats = {
+      ...template,
+      hp: Math.round(template.hp * scaleHp * formMul),
+      speed: template.speed * speedMul,
+      radius: template.radius * radiusMul,
+      contactDamage: Math.round(template.contactDamage * dmgMul),
+      projectileDamage: Math.round(template.projectileDamage * dmgMul),
+      scale: template.scale * (1 + formTier * 0.08),
+    };
+    const enemy = new Enemy(stats, new THREE.Vector3(x, 0, z), this.rng(), formTier);
     this.enemies.push(enemy);
     this.scene.add(enemy.group);
     this.spawnedThisWave += 1;

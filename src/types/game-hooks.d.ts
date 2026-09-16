@@ -8,6 +8,7 @@ declare global {
       setPausedForScreenshot: (paused: boolean) => void;
       setReducedMotion: (enabled: boolean) => void;
       hideDebugUi: (hidden: boolean) => void;
+      pickUpgrade: (index: number) => { mode: string };
     };
     __THREE_GAME_DIAGNOSTICS__?: {
       frame: number;
@@ -23,6 +24,8 @@ declare global {
       kills?: number;
       stress?: boolean;
       upgradeStacks?: Record<string, number>;
+      playerFormTier?: number;
+      enemyFormTier?: number;
       targetScore?: number;
       projectiles?: number;
       player: {

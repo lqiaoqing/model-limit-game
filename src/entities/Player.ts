@@ -78,10 +78,13 @@ export class Player {
   private readonly visorMat: THREE.MeshStandardMaterial;
   private readonly thrusterMat: THREE.MeshStandardMaterial;
   private readonly geometries: THREE.BufferGeometry[] = [];
-  private readonly ringGeo: THREE.RingGeometry;
+  private ringGeo: THREE.RingGeometry;
   private readonly ringMat: THREE.MeshBasicMaterial;
   private readonly ring: THREE.Mesh;
   private readonly thrusters: THREE.Mesh[] = [];
+  private formTier = 0;
+  private readonly formGroups: THREE.Group[] = [];
+  private readonly formAccents: THREE.MeshStandardMaterial[] = [];
 
   constructor(public stats: PlayerStats = { ...DEFAULT_PLAYER_STATS }) {
     this.ghostMat = new THREE.MeshBasicMaterial({
@@ -217,6 +220,159 @@ export class Player {
     this.ring.position.y = 0.03;
     this.group.add(this.ring);
     this.group.scale.setScalar(1.15);
+
+    // Form evolution parts (hidden until setFormTier unlocks them).
+    this.formGroups.push(this.buildFormTier1(), this.buildFormTier2(), this.buildFormTier3());
+    for (const g of this.formGroups) {
+      g.visible = false;
+      this.visual.add(g);
+    }
+  }
+
+  /**
+   * Morphological upgrades driven by retrofit stacks.
+   * 0 Scout → 1 Striker → 2 Assault → 3 Siege Frame.
+   */
+  setFormTier(
+    tier: number,
+    bias: { weapon: number; defense: number; total: number } = { weapon: 0, defense: 0, total: 0 },
+  ): void {
+    const next = Math.max(0, Math.min(3, Math.floor(tier)));
+    this.formTier = next;
+    for (let i = 0; i < this.formGroups.length; i += 1) {
+      this.formGroups[i].visible = i < next;
+    }
+    const scales = [1.15, 1.2, 1.28, 1.36];
+    this.group.scale.setScalar(scales[next] ?? 1.15);
+
+    // Dominant retrofit path tints the accent package.
+    const weapon = bias.weapon;
+    const defense = bias.defense;
+    let accent = '#22d3ee';
+    let armor = '#2dd4e8';
+    if (next > 0) {
+      if (weapon > defense + 1) {
+        accent = '#fbbf24';
+        armor = '#f59e0b';
+      } else if (defense > weapon + 1) {
+        accent = '#3ec6ff';
+        armor = '#60a5fa';
+      } else if (bias.total >= 3) {
+        accent = '#a78bfa';
+        armor = '#c4b5fd';
+      }
+    }
+    this.accentMat.color.set(accent);
+    this.accentMat.emissive.set(accent);
+    this.armorMat.color.set(armor);
+    this.armorMat.emissiveIntensity = 0.35 + next * 0.12;
+    this.glowMat.emissiveIntensity = 1.4 + next * 0.25;
+    this.ringMat.color.set(accent);
+    this.ghostMat.color.set(accent);
+    this.ringGeo.dispose();
+    const ringInner = 0.78 + next * 0.06;
+    this.ringGeo = new THREE.RingGeometry(ringInner, ringInner + 0.12, 40);
+    (this.ring as THREE.Mesh).geometry = this.ringGeo;
+
+    for (const mat of this.formAccents) {
+      mat.color.set(accent);
+      mat.emissive.set(accent);
+      mat.emissiveIntensity = 0.9 + next * 0.2;
+    }
+  }
+
+  getFormTier(): number {
+    return this.formTier;
+  }
+
+  private buildFormTier1(): THREE.Group {
+    const g = new THREE.Group();
+    const plate = this.box(0.5, 0.1, 0.55, this.armorMat, 0, 0.62, 0.15);
+    plate.castShadow = true;
+    const plate2 = this.box(0.42, 0.08, 0.4, this.armorMat, 0, 0.58, -0.45);
+    // Secondary stub cannon (right)
+    const stub = this.box(0.12, 0.12, 0.55, this.accentMat, 0.48, 0.55, -0.7);
+    stub.castShadow = true;
+    const stubRingMat = this.makeFormAccentMat();
+    const stubRingGeo = new THREE.TorusGeometry(0.08, 0.025, 6, 10);
+    this.geometries.push(stubRingGeo);
+    const stubRing = new THREE.Mesh(stubRingGeo, stubRingMat);
+    stubRing.position.set(0.48, 0.55, -1.0);
+    stubRing.rotation.y = Math.PI / 2;
+    g.add(plate, plate2, stub, stubRing);
+    return g;
+  }
+
+  private buildFormTier2(): THREE.Group {
+    const g = new THREE.Group();
+    // Barrel shrouds
+    const shroudGeo = new THREE.BoxGeometry(0.2, 0.2, 0.35);
+    this.geometries.push(shroudGeo);
+    const s1 = new THREE.Mesh(shroudGeo, this.chassisMat);
+    s1.position.set(-0.42, 0.55, -1.05);
+    const s2 = new THREE.Mesh(shroudGeo, this.chassisMat);
+    s2.position.set(0.48, 0.55, -0.95);
+    // Side blades
+    const bladeGeo = new THREE.BoxGeometry(0.06, 0.4, 0.7);
+    this.geometries.push(bladeGeo);
+    const b1 = new THREE.Mesh(bladeGeo, this.makeFormAccentMat());
+    b1.position.set(-0.95, 0.55, 0.1);
+    b1.rotation.z = 0.55;
+    const b2 = new THREE.Mesh(bladeGeo, this.makeFormAccentMat());
+    b2.position.set(0.9, 0.52, 0.15);
+    b2.rotation.z = -0.55;
+    // Wing thrusters
+    const wingGeo = new THREE.CylinderGeometry(0.08, 0.11, 0.42, 6);
+    this.geometries.push(wingGeo);
+    const w1 = new THREE.Mesh(wingGeo, this.thrusterMat);
+    w1.rotation.x = Math.PI / 2;
+    w1.position.set(-0.55, 0.48, 0.65);
+    const w2 = new THREE.Mesh(wingGeo, this.thrusterMat);
+    w2.rotation.x = Math.PI / 2;
+    w2.position.set(0.5, 0.46, 0.62);
+    this.thrusters.push(w1, w2);
+    g.add(s1, s2, b1, b2, w1, w2);
+    return g;
+  }
+
+  private buildFormTier3(): THREE.Group {
+    const g = new THREE.Group();
+    // Heavy side pods
+    const podGeo = new THREE.BoxGeometry(0.28, 0.32, 0.85);
+    this.geometries.push(podGeo);
+    const p1 = new THREE.Mesh(podGeo, this.chassisMat);
+    p1.position.set(-0.85, 0.55, -0.05);
+    p1.castShadow = true;
+    const p2 = new THREE.Mesh(podGeo, this.chassisMat);
+    p2.position.set(0.82, 0.52, -0.02);
+    p2.castShadow = true;
+    // Spine antenna
+    const spineGeo = new THREE.BoxGeometry(0.08, 0.35, 0.5);
+    this.geometries.push(spineGeo);
+    const spine = new THREE.Mesh(spineGeo, this.makeFormAccentMat());
+    spine.position.set(0, 0.85, 0.25);
+    // Core halo
+    const haloGeo = new THREE.TorusGeometry(0.55, 0.04, 6, 24);
+    this.geometries.push(haloGeo);
+    const halo = new THREE.Mesh(haloGeo, this.makeFormAccentMat());
+    halo.rotation.x = Math.PI / 2;
+    halo.position.set(0, 0.35, 0.05);
+    // Collar
+    const collar = this.box(1.15, 0.12, 0.35, this.armorMat, 0, 0.68, 0.05);
+    g.add(p1, p2, spine, halo, collar);
+    return g;
+  }
+
+  private makeFormAccentMat(): THREE.MeshStandardMaterial {
+    const mat = new THREE.MeshStandardMaterial({
+      color: '#22d3ee',
+      emissive: '#22d3ee',
+      emissiveIntensity: 1.1,
+      roughness: 0.3,
+      metalness: 0.4,
+    });
+    this.formAccents.push(mat);
+    return mat;
   }
 
   private spawnGhost(): void {
@@ -271,6 +427,7 @@ export class Player {
     this.visual.position.set(0, 0, 0);
     this.velocity.set(0, 0, 0);
     this.aim.set(0, -1);
+    this.setFormTier(0);
     this.stabilizeVisuals();
   }
 
@@ -463,6 +620,7 @@ export class Player {
     for (const g of this.ghosts) this.group.remove(g.mesh);
     this.ghosts.length = 0;
     for (const geo of this.geometries) geo.dispose();
+    for (const mat of this.formAccents) mat.dispose();
     this.ringGeo.dispose();
     this.chassisMat.dispose();
     this.armorMat.dispose();

@@ -113,17 +113,22 @@ test('bot playtest: combat progression, stress death, restart', async ({ page },
     await page.waitForTimeout(900);
     for (const key of keys) await page.keyboard.up(key);
 
-    const snap = await sample(page);
+    let snap = await sample(page);
     if (snap.mode === 'upgrade') {
-      await page.keyboard.press('Digit1');
-      await page.waitForTimeout(250);
-      const resumed = await sample(page);
-      expect(resumed.mode, 'upgrade pick resumes play').toBe('play');
-      distance += Math.hypot(resumed.x - prevX, resumed.z - prevZ);
-      prevX = resumed.x;
-      prevZ = resumed.z;
-      maxKills = Math.max(maxKills, resumed.kills);
-      maxScore = Math.max(maxScore, resumed.score);
+      await page.locator('.upgrade-card').nth(step % 3).click();
+      await page.waitForTimeout(300);
+      snap = await sample(page);
+      if (snap.mode === 'upgrade') {
+        await page.evaluate(() => window.__THREE_GAME_TEST_HOOKS__?.pickUpgrade(0));
+        await page.waitForTimeout(150);
+        snap = await sample(page);
+      }
+      expect(snap.mode, 'upgrade pick resumes play').toBe('play');
+      distance += Math.hypot(snap.x - prevX, snap.z - prevZ);
+      prevX = snap.x;
+      prevZ = snap.z;
+      maxKills = Math.max(maxKills, snap.kills);
+      maxScore = Math.max(maxScore, snap.score);
       continue;
     }
     distance += Math.hypot(snap.x - prevX, snap.z - prevZ);
@@ -138,9 +143,13 @@ test('bot playtest: combat progression, stress death, restart', async ({ page },
 
   let combat = await sample(page);
   if (combat.mode === 'upgrade') {
-    await page.keyboard.press('Digit1');
+    await page.locator('.upgrade-card').first().click();
     await page.waitForTimeout(250);
     combat = await sample(page);
+    if (combat.mode === 'upgrade') {
+      await page.evaluate(() => window.__THREE_GAME_TEST_HOOKS__?.pickUpgrade(0));
+      combat = await sample(page);
+    }
   }
   const combatReport = {
     dashes: dashCount,

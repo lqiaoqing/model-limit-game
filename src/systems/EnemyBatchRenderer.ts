@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import type { Enemy, EnemyKind } from '../entities/Enemy';
+import type { Enemy, EnemyKind, EnemyFormTier } from '../entities/Enemy';
 import { getEnemyAssets } from './EnemyAssets';
 
 const BATCH_KINDS: EnemyKind[] = ['chaser', 'ranged', 'elite'];
+const FORM_TIERS: EnemyFormTier[] = [0, 1, 2, 3];
 
 type Batch = {
   shell: THREE.InstancedMesh;
@@ -12,11 +13,11 @@ type Batch = {
 };
 
 /**
- * High-count enemies render as InstancedMesh (2 body draws + 1 foot ring per kind).
+ * High-count enemies render as InstancedMesh per kind + form tier.
  * Boss stays a unique mesh group (single instance).
  */
 export class EnemyBatchRenderer {
-  private readonly batches = new Map<EnemyKind, Batch>();
+  private readonly batches = new Map<string, Batch>();
   private readonly dummy = new THREE.Object3D();
   private readonly color = new THREE.Color();
 
@@ -26,23 +27,26 @@ export class EnemyBatchRenderer {
     // Anything past capacity is skipped by sync() and would fight invisibly.
     capacity = 400,
   ) {
+    const perTier = Math.max(120, Math.ceil(capacity / 2));
     for (const kind of BATCH_KINDS) {
-      const assets = getEnemyAssets(kind);
-      const shell = new THREE.InstancedMesh(assets.shellGeo, assets.shellMat, capacity);
-      const glow = new THREE.InstancedMesh(assets.glowGeo, assets.glowMat, capacity);
-      const foot = new THREE.InstancedMesh(assets.footGeo, assets.footMat, capacity);
-      shell.castShadow = false;
-      shell.receiveShadow = false;
-      glow.castShadow = false;
-      foot.castShadow = false;
-      shell.frustumCulled = false;
-      glow.frustumCulled = false;
-      foot.frustumCulled = false;
-      shell.count = 0;
-      glow.count = 0;
-      foot.count = 0;
-      scene.add(shell, glow, foot);
-      this.batches.set(kind, { shell, glow, foot, count: 0 });
+      for (const tier of FORM_TIERS) {
+        const assets = getEnemyAssets(kind, tier);
+        const shell = new THREE.InstancedMesh(assets.shellGeo, assets.shellMat, perTier);
+        const glow = new THREE.InstancedMesh(assets.glowGeo, assets.glowMat, perTier);
+        const foot = new THREE.InstancedMesh(assets.footGeo, assets.footMat, perTier);
+        shell.castShadow = false;
+        shell.receiveShadow = false;
+        glow.castShadow = false;
+        foot.castShadow = false;
+        shell.frustumCulled = false;
+        glow.frustumCulled = false;
+        foot.frustumCulled = false;
+        shell.count = 0;
+        glow.count = 0;
+        foot.count = 0;
+        scene.add(shell, glow, foot);
+        this.batches.set(`${kind}:${tier}`, { shell, glow, foot, count: 0 });
+      }
     }
   }
 
@@ -56,14 +60,16 @@ export class EnemyBatchRenderer {
         enemy.syncBossVisual();
         continue;
       }
-      const batch = this.batches.get(enemy.stats.kind);
+      const batch = this.batches.get(`${enemy.stats.kind}:${enemy.formTier}`);
       if (!batch) continue;
       const idx = batch.count;
       if (idx >= batch.shell.instanceMatrix.count) continue;
 
       const pos = enemy.group.position;
       const yaw = enemy.group.rotation.y;
-      const scale = enemy.stats.kind === 'elite' ? enemy.stats.scale : 1;
+      const kindScale = enemy.stats.kind === 'elite' ? enemy.stats.scale : 1;
+      const formScale = 1 + enemy.formTier * 0.04;
+      const scale = kindScale * formScale;
 
       this.dummy.position.set(pos.x, pos.y, pos.z);
       this.dummy.rotation.set(0, yaw, 0);
@@ -74,12 +80,12 @@ export class EnemyBatchRenderer {
 
       this.dummy.position.set(pos.x, 0.02, pos.z);
       this.dummy.rotation.set(-Math.PI / 2, 0, 0);
-      this.dummy.scale.setScalar(1);
+      this.dummy.scale.setScalar(1 + enemy.formTier * 0.06);
       this.dummy.updateMatrix();
       batch.foot.setMatrixAt(idx, this.dummy.matrix);
 
       // Telegraph flash via instance color on foot
-      const flash = enemy.telegraphTimer > 0 ? 1 : 0.55;
+      const flash = enemy.telegraphTimer > 0 ? 1 : 0.55 + enemy.formTier * 0.08;
       this.color.setRGB(flash, flash * 0.6, flash * 0.6);
       batch.foot.setColorAt(idx, this.color);
 

@@ -29,6 +29,7 @@ Procedural-only (no Tripo/Gemini/ElevenLabs keys on this machine).
 - [x] Combat feel pass (enemy-enemy spatial separation, contact DPS cut, stagger, contact sparks)
 - [x] Bot playtest under `@playwright/test` (`tests/bot-playtest.spec.ts`: combat, stress death, restart, pause)
 - [x] Wave-clear retrofit picker: 3-choice upgrades that scale player stats between waves
+- [x] Dual form evolution: player mech tiers by retrofit stacks; enemy silhouettes/stat packs by wave (4/7/10)
 
 ## Pending
 - Optional: player-facing stress toggle polish
