@@ -78,7 +78,7 @@ Kept in git: source, lockfile, design docs, scorecard, and key inspector reports
 
 ## Gameplay loop
 
-Survive waves of chaser / ranged / elite enemies. Every 5th wave is a **boss**. Collect shield / coolant / repair / ult pickups (magnet + chain multiplier). Manage **heat** or lock out your gun. Dash for i-frames; ult clears the screen. Clear a wave to pick one of three **retrofit** modules — stacks both strengthen stats and evolve your mech frame (Scout → Striker → Assault → Siege). Enemies also **evolve** at waves 4 / 7 / 10 with larger silhouettes and tougher packs.
+Survive waves of chaser / ranged / elite enemies. Every 5th wave is a **boss**. Collect shield / coolant / repair / ult pickups (magnet + chain multiplier). Manage **heat** or lock out your gun. Dash for i-frames; ult clears the screen. Clear a wave to pick one of three **retrofit** modules — stacks both strengthen stats and evolve your mech frame (Scout → Striker → Assault → Siege). After boss milestones (waves 6 / 11 / 16) hostiles **evolve once** (silhouette + discrete stat step); ordinary waves only add density, not raw stats.
 
 ---
 

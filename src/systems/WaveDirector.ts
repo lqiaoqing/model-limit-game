@@ -201,16 +201,19 @@ export class WaveDirector {
       z = THREE.MathUtils.clamp(z + Math.sign(dz || 1) * 6, -hd, hd);
     }
 
-    // Scale HP slightly with wave (not in stress dump for readability)
+    /**
+     * Difficulty comes only from discrete form tiers after boss milestones.
+     * No per-wave HP creep — that stacked with form multipliers and outran
+     * the player's retrofit curve.
+     */
     const formTier: EnemyFormTier = enemyFormTierForWave(this.wave);
-    const scaleHp = this.stressMode ? 1 : 1 + (this.wave - 1) * 0.06;
-    const formMul = 1 + formTier * 0.28;
-    const dmgMul = 1 + formTier * 0.14;
-    const speedMul = 1 + formTier * 0.05;
-    const radiusMul = 1 + formTier * 0.06;
+    const formMul = 1 + formTier * 0.18;
+    const dmgMul = 1 + formTier * 0.1;
+    const speedMul = 1 + formTier * 0.04;
+    const radiusMul = 1 + formTier * 0.05;
     const stats: EnemyStats = {
       ...template,
-      hp: Math.round(template.hp * scaleHp * formMul),
+      hp: Math.round(template.hp * formMul),
       speed: template.speed * speedMul,
       radius: template.radius * radiusMul,
       contactDamage: Math.round(template.contactDamage * dmgMul),

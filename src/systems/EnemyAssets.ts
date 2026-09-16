@@ -15,11 +15,14 @@ export type SharedEnemyAssets = {
 
 const cache = new Map<string, SharedEnemyAssets>();
 
-/** Wave thresholds that unlock a visual/stat form tier. */
+/**
+ * Form tiers unlock only at boss milestones (after waves 5 / 10 / 15),
+ * not every wave — difficulty steps are discrete so player retrofits can keep pace.
+ */
 export function enemyFormTierForWave(wave: number): EnemyFormTier {
-  if (wave >= 10) return 3;
-  if (wave >= 7) return 2;
-  if (wave >= 4) return 1;
+  if (wave >= 16) return 3;
+  if (wave >= 11) return 2;
+  if (wave >= 6) return 1;
   return 0;
 }
 

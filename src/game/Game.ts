@@ -115,6 +115,7 @@ export class Game {
   private pausedForScreenshot = false;
   private reducedMotion = false;
   private lastWaveShown = 0;
+  private lastEnemyFormTier = 0;
   private fpsAccum = 0;
   private fpsFrames = 0;
   private fps = 60;
@@ -337,6 +338,15 @@ export class Game {
       this.hud.showWaveBanner(boss ? `BOSS · WAVE ${state.wave}` : `WAVE ${state.wave}`, boss);
       if (boss) this.audio.boss();
       else this.audio.wave();
+      // Form tier steps only after boss milestones (waves 6 / 11 / 16).
+      const formTier = enemyFormTierForWave(state.wave);
+      if (formTier > this.lastEnemyFormTier) {
+        this.lastEnemyFormTier = formTier;
+        this.hud.pushKillFeed(`HOSTILES EVOLVED · T${formTier}`, 'boss');
+        window.setTimeout(() => {
+          this.hud.showWaveBanner(`HOSTILES EVOLVED · T${formTier}`, true);
+        }, 900);
+      }
       // Wave clear beat: slow-mo + ground pulse when advancing past first wave
       if (prev > 0) {
         this.feel.triggerSlowmo(0.45, 0.4);
@@ -815,6 +825,7 @@ export class Game {
     this.pickupChainTimer = 0;
     this.mode = 'play';
     this.lastWaveShown = 0;
+    this.lastEnemyFormTier = 0;
     this.rng = createSeededRandom(1);
     this.upgradeStacks = {};
     this.upgradeOffers = [];
