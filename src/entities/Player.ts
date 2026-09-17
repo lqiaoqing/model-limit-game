@@ -89,6 +89,11 @@ export class Player {
   private formTier = 0;
   private readonly formGroups: THREE.Group[] = [];
   private readonly formAccents: THREE.MeshStandardMaterial[] = [];
+  private weaponId: 'plasma' | 'rail' | 'scatter' = 'plasma';
+  private cannonBody!: THREE.Mesh;
+  private cannonShroud!: THREE.Mesh;
+  private muzzleRing!: THREE.Mesh;
+  private formAccent = '#22d3ee';
 
   constructor(public stats: PlayerStats = { ...DEFAULT_PLAYER_STATS }) {
     this.ghostMat = new THREE.MeshBasicMaterial({
@@ -159,11 +164,15 @@ export class Player {
     const cannonBody = this.box(0.16, 0.16, 0.95, this.accentMat, -0.42, 0.55, -0.85);
     cannonBody.castShadow = true;
     const cannonShroud = this.box(0.22, 0.22, 0.28, this.chassisMat, -0.42, 0.55, -0.35);
+    cannonShroud.castShadow = true;
     const muzzleRingGeo = new THREE.TorusGeometry(0.11, 0.03, 6, 12);
     this.geometries.push(muzzleRingGeo);
     const muzzleRing = new THREE.Mesh(muzzleRingGeo, this.glowMat);
     muzzleRing.position.set(-0.42, 0.55, -1.35);
     muzzleRing.rotation.y = Math.PI / 2;
+    this.cannonBody = cannonBody;
+    this.cannonShroud = cannonShroud;
+    this.muzzleRing = muzzleRing;
 
     // Cockpit canopy
     const canopy = this.box(0.38, 0.18, 0.42, this.visorMat, 0.05, 0.68, -0.35);
@@ -282,6 +291,69 @@ export class Player {
       mat.color.set(accent);
       mat.emissive.set(accent);
       mat.emissiveIntensity = 0.9 + next * 0.2;
+    }
+    this.formAccent = accent;
+    this.applyWeaponVisual();
+  }
+
+  /**
+   * Make plasma / rail / scatter read differently on the mech:
+   * barrel length/width, muzzle glow, and weapon-color tint.
+   */
+  setWeaponVisual(id: 'plasma' | 'rail' | 'scatter'): void {
+    this.weaponId = id;
+    this.applyWeaponVisual();
+  }
+
+  private applyWeaponVisual(): void {
+    const id = this.weaponId;
+    const weaponColor =
+      id === 'rail' ? '#fbbf24' : id === 'scatter' ? '#f472b6' : '#22d3ee';
+
+    // Barrel silhouette
+    if (id === 'rail') {
+      // Long heavy rail — longer + thicker + coils feel via shroud stretch
+      this.cannonBody.scale.set(1.15, 1.15, 1.35);
+      this.cannonBody.position.set(-0.42, 0.55, -0.95);
+      this.cannonShroud.scale.set(1.25, 1.25, 1.6);
+      this.cannonShroud.position.set(-0.42, 0.55, -0.25);
+      this.muzzleRing.scale.set(1.35, 1.35, 1.35);
+      this.muzzleRing.position.set(-0.42, 0.55, -1.55);
+      this.glowMat.emissiveIntensity = 2.0;
+    } else if (id === 'scatter') {
+      // Wide short scatter — shorter + fatter + bigger ring
+      this.cannonBody.scale.set(1.55, 1.35, 0.72);
+      this.cannonBody.position.set(-0.42, 0.55, -0.72);
+      this.cannonShroud.scale.set(1.5, 1.3, 1.1);
+      this.cannonShroud.position.set(-0.42, 0.55, -0.28);
+      this.muzzleRing.scale.set(1.7, 1.7, 1.7);
+      this.muzzleRing.position.set(-0.42, 0.55, -1.18);
+      this.glowMat.emissiveIntensity = 1.6;
+    } else {
+      // Balanced plasma repeater
+      this.cannonBody.scale.set(1, 1, 1);
+      this.cannonBody.position.set(-0.42, 0.55, -0.85);
+      this.cannonShroud.scale.set(1, 1, 1);
+      this.cannonShroud.position.set(-0.42, 0.55, -0.35);
+      this.muzzleRing.scale.set(1, 1, 1);
+      this.muzzleRing.position.set(-0.42, 0.55, -1.35);
+      this.glowMat.emissiveIntensity = 1.4 + this.formTier * 0.25;
+    }
+
+    // Weapon identity wins on muzzle glow + ring; chassis keeps form-tier accent
+    // blended toward weapon color so the switch is readable at a glance.
+    this.glowMat.color.set(weaponColor);
+    this.glowMat.emissive.set(weaponColor);
+    this.muzzleRing.material = this.glowMat;
+    this.accentMat.color.set(weaponColor);
+    this.accentMat.emissive.set(weaponColor);
+    this.ringMat.color.set(weaponColor);
+    this.ghostMat.color.set(weaponColor);
+    // Keep a hint of form-tier armor tone
+    if (this.formTier > 0 && this.formAccent !== weaponColor) {
+      this.accentMat.emissiveIntensity = 0.2 + this.formTier * 0.05;
+    } else {
+      this.accentMat.emissiveIntensity = 0.18;
     }
   }
 

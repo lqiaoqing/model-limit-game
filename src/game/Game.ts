@@ -39,7 +39,7 @@ import {
   type BossRuntime,
 } from '../systems/BossPhases';
 import { buildDiagnostics } from '../telemetry/buildDiagnostics';
-import { bossPhaseName, t, toggleLocale, upgradeText, weaponName } from '../i18n';
+import { bossPhaseName, t, toggleLocale, upgradeText, weaponName, weaponShort } from '../i18n';
 
 const ARENA: ArenaBounds = {
   halfWidth: 14,
@@ -810,11 +810,12 @@ export class Game {
     this.weapon = id;
     this.combatBuild.weapon = id;
     this.syncWeaponStats();
+    this.player.setWeaponVisual(id);
     const def = WEAPON_DEFS[id];
     const label = weaponName(id);
     this.hud.setActiveWeapon(id);
     this.hud.flashPickup(label, def.color);
-    this.hud.pushKillFeed(t().weaponPick(def.short), 'ranged');
+    this.hud.pushKillFeed(t().weaponPick(weaponShort(id)), 'ranged');
     this.vfx.spawnBurst(this.player.muzzle, def.color, 6, 4);
     this.audio.pickupChain(1);
     this.publishDiagnostics();
@@ -1088,6 +1089,7 @@ export class Game {
     this.upgradeStacks = {};
     this.upgradeOffers = [];
     this.weapon = 'plasma';
+    this.player.setWeaponVisual('plasma');
     resetCombatModifiers(this.combatMods);
     resetCombatBuild(this.combatBuild, this.combatMods);
     this.bossRuntime = createBossRuntime();

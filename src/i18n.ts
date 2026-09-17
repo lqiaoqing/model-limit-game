@@ -73,6 +73,9 @@ type Dict = {
   weaponPlasma: string;
   weaponRail: string;
   weaponScatter: string;
+  weaponPlasmaShort: string;
+  weaponRailShort: string;
+  weaponScatterShort: string;
   // boss phases
   phaseSweep: string;
   phaseLockdown: string;
@@ -145,6 +148,9 @@ const zh: Dict = {
   weaponPlasma: '等离子连发',
   weaponRail: '轨道炮',
   weaponScatter: '霰弹枪',
+  weaponPlasmaShort: '等离子',
+  weaponRailShort: '轨道',
+  weaponScatterShort: '霰弹',
   phaseSweep: '横扫',
   phaseLockdown: '封锁',
   phaseOverdrive: '过载',
@@ -232,6 +238,9 @@ const en: Dict = {
   weaponPlasma: 'Plasma Repeater',
   weaponRail: 'Railgun',
   weaponScatter: 'Scattergun',
+  weaponPlasmaShort: 'PLS',
+  weaponRailShort: 'RAIL',
+  weaponScatterShort: 'SCT',
   phaseSweep: 'SWEEP',
   phaseLockdown: 'LOCKDOWN',
   phaseOverdrive: 'OVERDRIVE',
@@ -319,6 +328,12 @@ export function weaponName(id: string): string {
   return t().weaponPlasma;
 }
 
+export function weaponShort(id: string): string {
+  if (id === 'rail') return t().weaponRailShort;
+  if (id === 'scatter') return t().weaponScatterShort;
+  return t().weaponPlasmaShort;
+}
+
 /** Apply locale to static HTML labels marked with data-i18n. */
 export function applyStaticLocale(): void {
   document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en';
@@ -339,10 +354,27 @@ export function applyStaticLocale(): void {
     'toggle.graphics': dict.toggleGraphics,
     'overlay.hint': dict.hint,
     'lang.toggle': locale === 'zh' ? 'EN' : '中文',
+    'toggle.lang': dict.toggleLang,
+    'weapon.plasma': dict.weaponPlasmaShort,
+    'weapon.rail': dict.weaponRailShort,
+    'weapon.scatter': dict.weaponScatterShort,
   };
   for (const [key, value] of Object.entries(map)) {
     document.querySelectorAll<HTMLElement>(`[data-i18n="${key}"]`).forEach((el) => {
       el.textContent = value;
     });
   }
+
+  const titles: Record<string, string> = {
+    plasma: `${dict.weaponPlasma} — 1`,
+    rail: `${dict.weaponRail} — 2`,
+    scatter: `${dict.weaponScatter} — 3`,
+  };
+  document.querySelectorAll<HTMLElement>('.weapon-chip').forEach((chip) => {
+    const id = chip.dataset.weapon ?? 'plasma';
+    const short = weaponShort(id);
+    const label = chip.querySelector('.weapon-short');
+    if (label) label.textContent = short;
+    if (titles[id]) chip.title = titles[id];
+  });
 }

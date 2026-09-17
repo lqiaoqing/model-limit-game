@@ -486,7 +486,8 @@ body {
 
 #status-line {
   position: absolute;
-  top: calc(max(12px, env(safe-area-inset-top)) + 78px);
+  /* Under weapon bar + boss strip so neither covers the status text. */
+  top: calc(max(12px, env(safe-area-inset-top)) + 158px);
   left: 50%;
   transform: translateX(-50%);
   padding: 6px 16px;
@@ -496,15 +497,18 @@ body {
   color: rgba(232, 238, 247, 0.85);
   background: linear-gradient(90deg, transparent, rgba(6, 12, 18, 0.7), transparent);
   border-bottom: 1px solid rgba(34, 211, 238, 0.35);
+  white-space: nowrap;
+  z-index: 4;
 }
 
 #boss-bar {
   position: absolute;
-  top: calc(max(12px, env(safe-area-inset-top)) + 52px);
+  top: calc(max(12px, env(safe-area-inset-top)) + 118px);
   left: 50%;
   transform: translateX(-50%);
   width: min(400px, 86vw);
   text-align: center;
+  z-index: 4;
 }
 
 #boss-name {
