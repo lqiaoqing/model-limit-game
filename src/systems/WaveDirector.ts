@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Enemy, ENEMY_TEMPLATES, type EnemyKind, type EnemyFormTier, type EnemyStats } from '../entities/Enemy';
 import { enemyFormTierForWave } from './EnemyAssets';
+import { composeWaveQueue, type SquadRecipeId } from './EncounterDirector';
 
 export type WaveState = {
   wave: number;
@@ -19,6 +20,7 @@ export class WaveDirector {
   private spawnedThisWave = 0;
   private totalThisWave = 0;
   private bossRef: Enemy | null = null;
+  private lastSquads: SquadRecipeId[] = [];
 
   wave = 1;
   stressMode = false;
@@ -42,6 +44,7 @@ export class WaveDirector {
     this.spawnedThisWave = 0;
     this.totalThisWave = 0;
     this.bossRef = null;
+    this.lastSquads = [];
   }
 
   readonly enemies: Enemy[] = [];
@@ -53,6 +56,10 @@ export class WaveDirector {
   get boss(): Enemy | null {
     if (this.bossRef && this.bossRef.alive) return this.bossRef;
     return null;
+  }
+
+  get squads(): SquadRecipeId[] {
+    return this.lastSquads;
   }
 
   getState(): WaveState {
@@ -121,37 +128,52 @@ export class WaveDirector {
     }
   }
 
+  /** Spawn a unit near a world point (boss reinforcements). */
+  forceSpawnNear(position: THREE.Vector3, kind: EnemyKind): void {
+    const hw = this.bounds.halfWidth - 1.2;
+    const hd = this.bounds.halfDepth - 1.2;
+    const angle = this.rng() * Math.PI * 2;
+    const radius = 1.6 + this.rng() * 1.4;
+    const x = THREE.MathUtils.clamp(position.x + Math.cos(angle) * radius, -hw, hw);
+    const z = THREE.MathUtils.clamp(position.z + Math.sin(angle) * radius, -hd, hd);
+    this.spawnEnemyAt(kind, x, z);
+  }
+
+  private spawnEnemyAt(kind: EnemyKind, x: number, z: number): void {
+    const template = ENEMY_TEMPLATES[kind];
+    const formTier: EnemyFormTier = enemyFormTierForWave(this.wave);
+    const formMul = 1 + formTier * 0.18;
+    const dmgMul = 1 + formTier * 0.1;
+    const speedMul = 1 + formTier * 0.04;
+    const radiusMul = 1 + formTier * 0.05;
+    const stats: EnemyStats = {
+      ...template,
+      hp: Math.round(template.hp * formMul),
+      speed: template.speed * speedMul,
+      radius: template.radius * radiusMul,
+      contactDamage: Math.round(template.contactDamage * dmgMul),
+      projectileDamage: Math.round(template.projectileDamage * dmgMul),
+      scale: template.scale * (1 + formTier * 0.08),
+    };
+    const enemy = new Enemy(stats, new THREE.Vector3(x, 0, z), this.rng(), formTier);
+    enemy.telegraphTimer = this.stressMode ? 0.2 : 0.4;
+    this.enemies.push(enemy);
+    this.scene.add(enemy.group);
+    if (kind === 'boss') this.bossRef = enemy;
+  }
+
   private beginWave(): void {
     const wave = this.wave;
     const isBossWave = wave % 5 === 0;
-    const countBase = this.stressMode
-      ? 55 + Math.min(180, wave * 10)
-      : 3 + Math.min(18, Math.floor(wave * 1.4));
-
-    const queue: EnemyKind[] = [];
-    if (isBossWave) {
-      queue.push('boss');
-    }
-
-    const chaserRatio = wave < 3 ? 0.85 : 0.5;
-    const rangedRatio = wave < 2 ? 0 : wave < 5 ? 0.35 : 0.3;
-    const eliteRatio = wave < 4 ? 0 : Math.min(0.25, 0.08 + wave * 0.02);
-
-    for (let i = 0; i < countBase; i += 1) {
-      const r = this.rng();
-      let kind: EnemyKind = 'chaser';
-      if (r < chaserRatio) kind = 'chaser';
-      else if (r < chaserRatio + rangedRatio) kind = 'ranged';
-      else if (r < chaserRatio + rangedRatio + eliteRatio) kind = 'elite';
-      queue.push(kind);
-    }
-
-    // Stress mode dumps a big pack immediately for perf ceiling.
-    if (this.stressMode) {
-      for (let i = 0; i < 120; i += 1) queue.push('chaser');
-    }
+    const { queue, squads } = composeWaveQueue({
+      wave,
+      stressMode: this.stressMode,
+      rng: this.rng,
+      bossWave: isBossWave,
+    });
 
     this.spawnQueue = queue;
+    this.lastSquads = squads;
     this.totalThisWave = queue.length;
     this.spawnedThisWave = 0;
     this.spawnTimer = 0;
@@ -221,8 +243,8 @@ export class WaveDirector {
       scale: template.scale * (1 + formTier * 0.08),
     };
     const enemy = new Enemy(stats, new THREE.Vector3(x, 0, z), this.rng(), formTier);
-    // Spawn anticipation: flash the foot ring so new packs read as incoming.
-    enemy.telegraphTimer = 0.45;
+    // Spawn anticipation: longer telegraph on non-stress so squad entries read.
+    enemy.telegraphTimer = this.stressMode ? 0.2 : 0.55;
     this.enemies.push(enemy);
     this.scene.add(enemy.group);
     this.spawnedThisWave += 1;

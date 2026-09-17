@@ -210,6 +210,62 @@ body {
   clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
 }
 
+/* —— Weapon select chips —— */
+.weapon-bar {
+  position: absolute;
+  top: max(78px, calc(env(safe-area-inset-top) + 66px));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  z-index: 5;
+}
+
+.weapon-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  min-width: 72px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(6, 12, 18, 0.72);
+  color: rgba(232, 238, 247, 0.78);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+.weapon-chip .weapon-key {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  font-size: 0.58rem;
+  color: rgba(232, 238, 247, 0.7);
+}
+
+.weapon-chip:hover {
+  border-color: rgba(34, 211, 238, 0.55);
+  color: #e8eef7;
+}
+
+.weapon-chip.active {
+  border-color: var(--hud-cyan);
+  color: #e8f7ff;
+  background: rgba(8, 28, 38, 0.88);
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.25);
+}
+
+.weapon-chip.active .weapon-key {
+  border-color: var(--hud-cyan);
+  color: var(--hud-cyan);
+}
+
 /* —— Combat cluster: combo + ult ring + foes —— */
 .combat {
   top: max(12px, env(safe-area-inset-top));
@@ -733,6 +789,21 @@ body {
   .mission {
     top: auto;
     bottom: calc(max(18px, env(safe-area-inset-bottom)) + 150px);
+  }
+
+  .weapon-bar {
+    top: auto;
+    bottom: max(118px, calc(env(safe-area-inset-bottom) + 104px));
+    gap: 4px;
+  }
+
+  .weapon-chip {
+    min-width: 58px;
+    padding: 5px 8px;
+  }
+
+  .weapon-chip .weapon-key {
+    display: none;
   }
 
   #status-line {

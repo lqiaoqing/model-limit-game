@@ -59,6 +59,10 @@ export class Player {
   shield = DEFAULT_PLAYER_STATS.maxShield;
   heat = 0;
   overheated = false;
+  /** When true, hitting max heat fires an EMP pulse instead of locking the gun. */
+  overheatEmp = false;
+  /** Set for one update when heat max triggers the EMP path. */
+  overheatPulse = false;
   ultCharge = 0;
   dashTimer = 0;
   dashCooldown = 0;
@@ -413,6 +417,8 @@ export class Player {
     this.shield = this.stats.maxShield;
     this.heat = 0;
     this.overheated = false;
+    this.overheatEmp = false;
+    this.overheatPulse = false;
     this.ultCharge = 0;
     this.dashTimer = 0;
     this.dashCooldown = 0;
@@ -449,6 +455,7 @@ export class Player {
     bounds: ArenaBounds,
   ): { fired: boolean } {
     const result = { fired: false };
+    this.overheatPulse = false;
     if (!this.alive) return result;
 
     this.invulnTimer = Math.max(0, this.invulnTimer - delta);
@@ -555,7 +562,13 @@ export class Player {
       this.recoil = 1;
       if (this.heat >= this.stats.maxHeat) {
         this.heat = this.stats.maxHeat;
-        this.overheated = true;
+        if (this.overheatEmp) {
+          this.heat = this.stats.maxHeat * 0.32;
+          this.overheated = false;
+          this.overheatPulse = true;
+        } else {
+          this.overheated = true;
+        }
       }
       result.fired = true;
     }
@@ -586,14 +599,16 @@ export class Player {
     if (this.heat < this.stats.maxHeat * 0.35) this.overheated = false;
   }
 
-  takeDamage(amount: number): boolean {
-    if (!this.alive || this.invulnTimer > 0) return false;
+  takeDamage(amount: number): { hit: boolean; shieldBroke: boolean } {
+    if (!this.alive || this.invulnTimer > 0) return { hit: false, shieldBroke: false };
+    const shieldBefore = this.shield;
     let remaining = amount;
     if (this.shield > 0) {
       const absorbed = Math.min(this.shield, remaining);
       this.shield -= absorbed;
       remaining -= absorbed;
     }
+    const shieldBroke = shieldBefore > 0 && this.shield <= 0;
     if (remaining > 0) this.hp -= remaining;
     this.invulnTimer = this.stats.invulnAfterHit;
     // Armor crack flash — red emissive pulse on chassis
@@ -608,7 +623,7 @@ export class Player {
       this.alive = false;
       this.group.visible = false;
     }
-    return true;
+    return { hit: true, shieldBroke };
   }
 
   /** Heat ratio 0–1 for steam VFX. */

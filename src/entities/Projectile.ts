@@ -10,6 +10,13 @@ export class Projectile {
   damage = 0;
   owner: ProjectileOwner = 'player';
   radius = 0.12;
+  pierce = 0;
+  crit = false;
+  sourceWeapon: string | null = null;
+  /** Targets already damaged by this projectile (prevents pierce re-hits). */
+  readonly hitSet = new Set<string>();
+  /** How many targets this projectile has already damaged. */
+  hitsLanded = 0;
 
   private readonly core: THREE.Mesh;
   private readonly trail: THREE.Mesh;
@@ -41,11 +48,17 @@ export class Projectile {
     damage: number,
     owner: ProjectileOwner,
     color: string,
+    extras?: { pierce?: number; crit?: boolean; sourceWeapon?: string | null },
   ): void {
     this.active = true;
     this.life = 2.2;
     this.damage = damage;
     this.owner = owner;
+    this.pierce = extras?.pierce ?? 0;
+    this.crit = extras?.crit ?? false;
+    this.sourceWeapon = extras?.sourceWeapon ?? null;
+    this.hitSet.clear();
+    this.hitsLanded = 0;
     this.group.visible = true;
     this.group.position.copy(origin);
     this.velocity.copy(direction).normalize().multiplyScalar(speed);
@@ -102,10 +115,11 @@ export class ProjectilePool {
     damage: number,
     owner: ProjectileOwner,
     color: string,
+    extras?: { pierce?: number; crit?: boolean; sourceWeapon?: string | null },
   ): Projectile | null {
     for (const p of this.projectiles) {
       if (!p.active) {
-        p.fire(origin, direction, speed, damage, owner, color);
+        p.fire(origin, direction, speed, damage, owner, color, extras);
         return p;
       }
     }

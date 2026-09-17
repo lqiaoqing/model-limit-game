@@ -24,6 +24,9 @@ declare global {
       kills?: number;
       stress?: boolean;
       upgradeStacks?: Record<string, number>;
+      weapon?: string;
+      modifiers?: string[];
+      bossPhase?: number | null;
       playerFormTier?: number;
       enemyFormTier?: number;
       targetScore?: number;
@@ -36,6 +39,10 @@ declare global {
         ult?: number;
         alive?: boolean;
         speed?: number;
+        fireInterval?: number;
+        projectileDamage?: number;
+        projectileSpeed?: number;
+        heatPerShot?: number;
         position: { x: number; y: number; z: number };
       };
       renderer: {

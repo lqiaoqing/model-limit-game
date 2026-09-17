@@ -100,6 +100,8 @@ export class Enemy {
   staggerTimer = 0;
   /** Visual/stat form unlocked by wave progression. */
   readonly formTier: EnemyFormTier;
+  /** Titan phase emissive tint; null keeps template color. */
+  bossPhaseColor: string | null = null;
 
   private bossVisual: THREE.Group | null = null;
   private bossRings: THREE.Mesh[] = [];
@@ -173,6 +175,10 @@ export class Enemy {
     if (this.bossRings[0]) this.bossRings[0].rotation.z += 0.01;
     if (this.bossRings[1]) this.bossRings[1].rotation.z -= 0.014;
     if (this.bossCore) this.bossCore.rotation.y += 0.02;
+    if (this.bossPhaseColor && this.bossCore) {
+      const mat = this.bossCore.material as THREE.MeshStandardMaterial;
+      if (mat?.emissive) mat.emissive.set(this.bossPhaseColor);
+    }
   }
 
   update(
@@ -184,6 +190,7 @@ export class Enemy {
     if (!this.alive) return;
     this.wantShoot = false;
     this.hitFlashTimer = Math.max(0, this.hitFlashTimer - delta);
+    this.telegraphTimer = Math.max(0, this.telegraphTimer - delta);
 
     if (this.staggerTimer > 0) {
       this.staggerTimer = Math.max(0, this.staggerTimer - delta);
@@ -227,7 +234,6 @@ export class Enemy {
       moveDir.normalize();
     } else if (this.stats.kind === 'chaser') {
       this.lungeTimer = Math.max(0, this.lungeTimer - delta);
-      this.telegraphTimer = Math.max(0, this.telegraphTimer - delta);
       if (this.lungeTimer <= 0 && this.telegraphTimer <= 0 && dist < 4.5) {
         this.telegraphTimer = 0.35;
       }

@@ -1,8 +1,9 @@
 import type { PlayerStats } from '../entities/Player';
+import type { CombatModifiers } from '../combat/CombatModifiers';
+import type { WeaponId } from '../combat/Weapons';
 
 export type UpgradeId =
   | 'overclock'
-  | 'he_rounds'
   | 'thrusters'
   | 'armor'
   | 'shield_bank'
@@ -10,9 +11,14 @@ export type UpgradeId =
   | 'capacitor'
   | 'dash_servos'
   | 'mag_accel'
-  | 'ult_bearing'
-  | 'reactive_plating'
-  | 'ult_core';
+  | 'arc_capacitor'
+  | 'overheat_cascade'
+  | 'critical_conductor'
+  | 'rail_bore'
+  | 'rail_reactor'
+  | 'scatter_choke'
+  | 'dash_detonation'
+  | 'shield_nova';
 
 export type UpgradeDef = {
   id: UpgradeId;
@@ -20,7 +26,9 @@ export type UpgradeDef = {
   desc: string;
   color: string;
   maxStacks: number;
-  apply: (stats: PlayerStats) => void;
+  /** Soft bias when this weapon is active (1 = neutral). */
+  weaponAffinity?: WeaponId;
+  apply: (stats: PlayerStats, mods: CombatModifiers) => void;
 };
 
 export const UPGRADE_POOL: UpgradeDef[] = [
@@ -32,16 +40,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     maxStacks: 4,
     apply: (s) => {
       s.fireInterval = Math.max(0.062, s.fireInterval * 0.9);
-    },
-  },
-  {
-    id: 'he_rounds',
-    name: 'HE Rounds',
-    desc: 'Projectile damage +2',
-    color: '#fbbf24',
-    maxStacks: 5,
-    apply: (s) => {
-      s.projectileDamage += 2;
     },
   },
   {
@@ -116,34 +114,92 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     },
   },
   {
-    id: 'ult_bearing',
-    name: 'Ult Bearing',
-    desc: 'Ult charge/kill +1.5',
-    color: '#a78bfa',
-    maxStacks: 3,
-    apply: (s) => {
-      s.ultChargePerKill += 1.5;
+    id: 'arc_capacitor',
+    name: 'Arc Capacitor',
+    desc: 'Kills chain lightning to +1 nearby',
+    color: '#38bdf8',
+    maxStacks: 2,
+    weaponAffinity: 'plasma',
+    apply: (_s, mods) => {
+      mods.arcChain += 1;
     },
   },
   {
-    id: 'reactive_plating',
-    name: 'Reactive Plating',
-    desc: 'Hit i-frames +0.05s',
+    id: 'overheat_cascade',
+    name: 'Overheat Cascade',
+    desc: 'Overheat becomes EMP blast',
+    color: '#f97316',
+    maxStacks: 1,
+    weaponAffinity: 'plasma',
+    apply: (_s, mods) => {
+      mods.overheatEmp = true;
+    },
+  },
+  {
+    id: 'critical_conductor',
+    name: 'Critical Conductor',
+    desc: 'Chain hits may crit ×1.5',
+    color: '#e879f9',
+    maxStacks: 1,
+    weaponAffinity: 'plasma',
+    apply: (_s, mods) => {
+      mods.critConductor = true;
+    },
+  },
+  {
+    id: 'rail_bore',
+    name: 'Rail Bore',
+    desc: 'Rail pierce +1 · pierce damage +',
+    color: '#fbbf24',
+    maxStacks: 2,
+    weaponAffinity: 'rail',
+    apply: (s, mods) => {
+      mods.railPierce += 1;
+      s.projectileDamage += 2;
+    },
+  },
+  {
+    id: 'rail_reactor',
+    name: 'Rail Reactor',
+    desc: 'Rail kills refund 20% heat',
     color: '#f59e0b',
-    maxStacks: 3,
-    apply: (s) => {
-      s.invulnAfterHit = Math.min(0.85, s.invulnAfterHit + 0.05);
+    maxStacks: 1,
+    weaponAffinity: 'rail',
+    apply: (_s, mods) => {
+      mods.railHeatRefund = true;
     },
   },
   {
-    id: 'ult_core',
-    name: 'Ult Core',
-    desc: 'Ult damage +8 · radius +0.4',
-    color: '#c4b5fd',
-    maxStacks: 3,
-    apply: (s) => {
-      s.ultDamage += 8;
-      s.ultRadius += 0.4;
+    id: 'scatter_choke',
+    name: 'Scatter Choke',
+    desc: 'Close-range bonus damage',
+    color: '#f472b6',
+    maxStacks: 2,
+    weaponAffinity: 'scatter',
+    apply: (s, mods) => {
+      mods.scatterCloseBonus = true;
+      s.projectileDamage += 1;
+    },
+  },
+  {
+    id: 'dash_detonation',
+    name: 'Dash Detonation',
+    desc: 'Dash leaves a delayed blast',
+    color: '#22d3ee',
+    maxStacks: 1,
+    weaponAffinity: 'scatter',
+    apply: (_s, mods) => {
+      mods.dashDetonation = true;
+    },
+  },
+  {
+    id: 'shield_nova',
+    name: 'Shield Nova',
+    desc: 'Shield break emits a nova',
+    color: '#3ec6ff',
+    maxStacks: 1,
+    apply: (_s, mods) => {
+      mods.shieldNova = true;
     },
   },
 ];
@@ -155,21 +211,22 @@ export type UpgradeOffer = {
   color: string;
 };
 
-/** Pick 3 distinct offers weighted toward under-stacked upgrades. */
+/** Pick 3 distinct offers weighted toward under-stacked upgrades + weapon affinity. */
 export function rollUpgradeOffers(
   stacks: Partial<Record<UpgradeId, number>>,
   rng: () => number,
+  activeWeapon?: WeaponId,
   count = 3,
 ): UpgradeOffer[] {
   const eligible = UPGRADE_POOL.filter((u) => (stacks[u.id] ?? 0) < u.maxStacks);
   const bag = eligible.slice();
   const offers: UpgradeOffer[] = [];
   while (offers.length < count && bag.length > 0) {
-    // Prefer lower stack counts so choices stay diverse.
     let total = 0;
     const weights = bag.map((u) => {
       const stack = stacks[u.id] ?? 0;
-      const w = 1 / (1 + stack * 0.85);
+      let w = 1 / (1 + stack * 0.85);
+      if (activeWeapon && u.weaponAffinity === activeWeapon) w *= 1.6;
       total += w;
       return w;
     });

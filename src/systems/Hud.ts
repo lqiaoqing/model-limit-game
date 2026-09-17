@@ -21,6 +21,7 @@ export type HudSnapshot = {
   deathCause: string;
   stress: boolean;
   lowGraphics: boolean;
+  weapon?: string;
 };
 
 export type UpgradeCardView = {
@@ -72,6 +73,7 @@ export class Hud {
     upgradePanel: this.el('#upgrade-panel'),
     upgradeCards: this.el('#upgrade-cards'),
     upgradeTitle: this.el('#upgrade-title'),
+    weaponBar: this.el('#weapon-bar'),
   };
 
   private waveBannerTimer = 0;
@@ -81,6 +83,7 @@ export class Hud {
   private onStress: (on: boolean) => void = () => undefined;
   private onGraphics: (low: boolean) => void = () => undefined;
   private onUpgradePick: (index: number) => void = () => undefined;
+  private onWeaponPick: (index: number) => void = () => undefined;
 
   constructor() {
     this.els.overlayPrimary.addEventListener('click', () => this.onPrimary());
@@ -88,12 +91,28 @@ export class Hud {
     this.els.stressToggle.addEventListener('change', () => this.onStress(this.els.stressToggle.checked));
     this.els.gfxToggle.addEventListener('change', () => this.onGraphics(this.els.gfxToggle.checked));
 
+    const chips = this.els.weaponBar.querySelectorAll<HTMLButtonElement>('.weapon-chip');
+    chips.forEach((chip, index) => {
+      chip.addEventListener('click', () => this.onWeaponPick(index));
+    });
+
     // Combo pips (8 segments)
     for (let i = 0; i < 8; i += 1) {
       const pip = document.createElement('i');
       this.els.comboPips.appendChild(pip);
     }
     this.els.ultRing.style.strokeDasharray = String(this.ultCircumference);
+  }
+
+  setWeaponPickHandler(handler: (index: number) => void): void {
+    this.onWeaponPick = handler;
+  }
+
+  setActiveWeapon(weapon: string): void {
+    const chips = this.els.weaponBar.querySelectorAll<HTMLElement>('.weapon-chip');
+    chips.forEach((chip) => {
+      chip.classList.toggle('active', chip.dataset.weapon === weapon);
+    });
   }
 
   setOverlayHandlers(primary: () => void, secondary: () => void): void {
@@ -252,6 +271,7 @@ export class Hud {
     els.enemiesValue.textContent = String(snapshot.enemies);
     els.statusLine.textContent = snapshot.status;
     els.stressBadge.classList.toggle('hidden', !snapshot.stress);
+    if (snapshot.weapon) this.setActiveWeapon(snapshot.weapon);
 
     if (snapshot.boss.visible) {
       els.bossBar.classList.remove('hidden');

@@ -22,12 +22,13 @@ Open **http://127.0.0.1:5188/**
 | Move | WASD / arrows |
 | Aim | Mouse |
 | Fire | Hold LMB |
+| Switch weapon | 1 Plasma · 2 Railgun · 3 Scattergun (or HUD chips) |
 | Dash (i-frames) | Shift / Space |
 | Ultimate | Q (when ring is full) |
 | Pause | P |
 | Restart | R |
 | Pick retrofit | 1 / 2 / 3 (or click) after clearing a wave |
-| Mobile | Left stick + DASH / ULT (auto-fire when stick moves) |
+| Mobile | Left stick + DASH / ULT (auto-fire when stick moves); tap weapon chips |
 
 ### Stress / Low Graphics
 
@@ -78,7 +79,9 @@ Kept in git: source, lockfile, design docs, scorecard, and key inspector reports
 
 ## Gameplay loop
 
-Survive waves of chaser / ranged / elite enemies. Every 5th wave is a **boss**. Collect shield / coolant / repair / ult pickups (magnet + chain multiplier). Manage **heat** or lock out your gun. Dash for i-frames; ult clears the screen. Clear a wave to pick one of three **retrofit** modules — stacks both strengthen stats and evolve your mech frame (Scout → Striker → Assault → Siege). After boss milestones (waves 6 / 11 / 16) hostiles **evolve once** (silhouette + discrete stat step); ordinary waves only add density, not raw stats.
+Survive waves of chaser / ranged / elite enemies assembled by an **EncounterDirector** (threat-budget squads: Hunter Pack, Artillery Nest, Shield Wall, Assassin Strike, Suppression) with spawn telegraphs. Every 5th wave is **TITAN-07**, a multi-phase boss (Sweep → Lockdown → Overdrive). Collect shield / coolant / repair / ult pickups. Manage **heat** or lock out your gun — with *Overheat Cascade*, overheat becomes an EMP instead. Dash for i-frames; ult clears the screen.
+
+Pick one of three **weapons** anytime (`1/2/3`): Plasma Repeater (sustain), Railgun (pierce), Scattergun (close burst). Wave-clear **retrofit** modules mix stat upgrades with rule-changers (Arc chain, EMP overheat, crit conductor, rail bore/reactor, scatter choke, dash detonation, shield nova) so builds actually fork. After boss milestones hostiles **evolve once** (silhouette + discrete stat step).
 
 ---
 

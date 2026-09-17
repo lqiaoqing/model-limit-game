@@ -5,6 +5,7 @@ import { createRenderer, resizeRenderer } from '../core/Renderer';
 import { Cover } from '../entities/Cover';
 import { Pickup, type PickupKind } from '../entities/Pickup';
 import { Player, DEFAULT_PLAYER_STATS, type ArenaBounds } from '../entities/Player';
+import type { Enemy } from '../entities/Enemy';
 import { ProjectilePool } from '../entities/Projectile';
 import { AudioSystem } from '../systems/AudioSystem';
 import { CameraRig } from '../systems/CameraRig';
@@ -26,6 +27,29 @@ import {
 } from '../systems/UpgradePool';
 import { enemyFormTierForWave } from '../systems/EnemyAssets';
 import { createSeededRandom } from '../utils/random';
+import { WEAPON_DEFS, weaponAt, type WeaponId } from '../combat/Weapons';
+import {
+  ARC_CHAIN_DAMAGE,
+  ARC_CHAIN_RANGE,
+  CRIT_MULTIPLIER,
+  DASH_BLAST_DAMAGE,
+  DASH_BLAST_RADIUS,
+  OVERHEAT_EMP_DAMAGE,
+  OVERHEAT_EMP_RADIUS,
+  SCATTER_CLOSE_RANGE,
+  SHIELD_NOVA_DAMAGE,
+  SHIELD_NOVA_RADIUS,
+  createCombatModifiers,
+  modifierIds,
+  resetCombatModifiers,
+  type CombatModifiers,
+} from '../combat/CombatModifiers';
+import {
+  advanceBossPhase,
+  createBossRuntime,
+  getBossPhase,
+  type BossRuntime,
+} from '../systems/BossPhases';
 
 const ARENA: ArenaBounds = {
   halfWidth: 14,
@@ -95,6 +119,7 @@ export class Game {
     pausePressed: false,
     restartPressed: false,
     upgradeChoice: -1,
+    weaponChoice: -1,
   };
 
   private readonly tmp = {
@@ -118,6 +143,13 @@ export class Game {
   private lastEnemyFormTier = 0;
   private fpsAccum = 0;
   private fpsFrames = 0;
+  private weapon: WeaponId = 'plasma';
+  /** Upgrade deltas relative to the *active* weapon def — never vs plasma defaults. */
+  private weaponBonuses = { fireMul: 1, speedMul: 1, dmgBonus: 0 };
+  private readonly combatMods: CombatModifiers = createCombatModifiers();
+  private bossRuntime: BossRuntime = createBossRuntime();
+  private lastBossRef: Enemy | null = null;
+  private dashBlasts: Array<{ pos: THREE.Vector3; timer: number }> = [];
   private fps = 60;
   private stressMode = false;
   private lowGraphics = false;
@@ -162,6 +194,9 @@ export class Game {
     this.hud.setStressHandler((on) => this.setStressMode(on));
     this.hud.setGraphicsHandler((low) => this.setLowGraphics(low));
     this.hud.setUpgradePickHandler((index) => this.applyUpgrade(index));
+    this.hud.setWeaponPickHandler((index) => {
+      if (this.mode === 'play') this.setWeapon(weaponAt(index));
+    });
 
     this.createScene();
     this.installTestHooks();
@@ -222,6 +257,8 @@ export class Game {
       if (this.inputFrame.upgradeChoice >= 0) {
         this.applyUpgrade(this.inputFrame.upgradeChoice);
       }
+    } else if (this.mode === 'play' && this.inputFrame.weaponChoice >= 0) {
+      this.setWeapon(weaponAt(this.inputFrame.weaponChoice));
     } else if (this.inputFrame.pausePressed && this.mode !== 'dead') {
       this.mode = this.mode === 'paused' ? 'play' : 'paused';
     }
@@ -260,8 +297,10 @@ export class Game {
   private simulate(delta: number, elapsed: number): void {
     this.input.computeAim(this.player.group.position, this.tmp.aim);
 
+    this.player.overheatEmp = this.combatMods.overheatEmp;
     const dashHeld = this.inputFrame.dashPressed;
     const beforeOverheat = this.player.overheated;
+    const dashTimerBefore = this.player.dashTimer;
     const fire = this.player.update(
       delta,
       elapsed,
@@ -271,6 +310,7 @@ export class Game {
       dashHeld,
       ARENA,
     );
+    const dashStarted = this.player.dashTimer > 0 && dashTimerBefore <= 0;
 
     if (dashHeld && this.player.dashCooldown > DEFAULT_PLAYER_STATS.dashCooldown - 0.05) {
       this.audio.dash();
@@ -278,31 +318,25 @@ export class Game {
       this.feel.triggerFovPunch(2);
     }
 
-    if (this.player.overheated && !beforeOverheat) {
+    if (dashStarted && this.combatMods.dashDetonation) {
+      this.dashBlasts.push({
+        pos: this.player.group.position.clone().setY(0.2),
+        timer: 0.28,
+      });
+      this.vfx.spawnBurst(this.player.group.position.clone().setY(0.2), '#f472b6', 6, 3.5);
+    }
+
+    if (this.player.overheatPulse) {
+      this.castOverheatEmp();
+    } else if (this.player.overheated && !beforeOverheat) {
       this.audio.overheat();
     }
 
     if (fire.fired) {
-      this.audio.shoot();
-      this.tmp.dir.set(this.player.aim.x, 0, this.player.aim.y);
-      this.projectiles.spawn(
-        this.player.muzzle,
-        this.tmp.dir,
-        this.player.stats.projectileSpeed,
-        this.player.stats.projectileDamage,
-        'player',
-        '#22d3ee',
-      );
-      this.vfx.spawnBurst(this.player.muzzle, '#7ae7ff', 3, 3.5);
-      // Shell casing flick
-      this.vfx.spawnBurst(
-        this.player.muzzle.clone().add(new THREE.Vector3(-this.player.aim.y, 0.1, this.player.aim.x).multiplyScalar(0.2)),
-        '#fbbf24',
-        1,
-        2.2,
-      );
-      this.feel.triggerFovPunch(1.1);
+      this.firePlayerWeapon();
     }
+
+    this.tickDashBlasts(delta);
 
     // Heat steam
     if (this.player.getHeatRatio() > 0.45 && this.rng() < 0.35) {
@@ -364,9 +398,11 @@ export class Game {
       const rr = enemy.radius + PLAYER_RADIUS;
       const distSq = dx * dx + dz * dz;
       if (distSq < rr * rr) {
-        if (this.player.takeDamage(enemy.stats.contactDamage)) {
+        const hurt = this.player.takeDamage(enemy.stats.contactDamage);
+        if (hurt.hit) {
           this.lastDeathCause = enemy.stats.kind;
           this.onPlayerHurt();
+          if (hurt.shieldBroke) this.maybeShieldNova();
           // Shove the attacker back out so it cannot stay glued to the hull.
           const dist = Math.max(Math.sqrt(distSq), 0.0001);
           const strength = CONTACT_KNOCKBACK[enemy.stats.kind] ?? 8;
@@ -409,15 +445,20 @@ export class Game {
           this.player.group.position.z - origin.z,
         ).normalize();
         if (enemy.stats.kind === 'boss') {
-          for (const spread of [-0.28, 0, 0.28]) {
+          this.updateBossPhase(enemy);
+          const phase = getBossPhase(this.bossRuntime.phase);
+          const count = phase.fanCount;
+          const half = ((count - 1) / 2) * phase.fanSpread;
+          for (let i = 0; i < count; i += 1) {
+            const spread = -half + i * phase.fanSpread;
             const d = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), spread);
             this.projectiles.spawn(
               origin,
               d,
-              enemy.stats.projectileSpeed,
-              enemy.stats.projectileDamage,
+              enemy.stats.projectileSpeed * (phase.id === 3 ? 1.12 : 1),
+              enemy.stats.projectileDamage * phase.projectileDamageMul,
               'enemy',
-              '#fb7185',
+              phase.color,
             );
           }
         } else {
@@ -433,6 +474,7 @@ export class Game {
       }
     }
 
+    this.tickBossLogic(delta);
     this.projectiles.update(delta);
     this.resolveProjectileHits();
 
@@ -564,18 +606,37 @@ export class Game {
       if (p.owner === 'player') {
         for (const enemy of this.waves.enemies) {
           if (!enemy.alive) continue;
+          if (p.hitSet.has(enemy.group.uuid)) continue;
           const dx = pos.x - enemy.group.position.x;
           const dz = pos.z - enemy.group.position.z;
           const rr = enemy.radius + p.radius;
           if (dx * dx + dz * dz <= rr * rr) {
+            p.hitSet.add(enemy.group.uuid);
             enemy.hitFlash();
-            const died = enemy.takeDamage(p.damage);
+            let dmg = p.damage;
+            if (
+              this.combatMods.scatterCloseBonus &&
+              p.sourceWeapon === 'scatter' &&
+              pos.distanceTo(this.player.group.position) < SCATTER_CLOSE_RANGE
+            ) {
+              dmg *= 1.35;
+            }
+            // Rail Bore grows with targets already passed, not remaining pierce.
+            if (this.combatMods.railPierce > 0 && p.sourceWeapon === 'rail') {
+              dmg *= 1 + p.hitsLanded * 0.08;
+            }
+            p.hitsLanded += 1;
+            const died = enemy.takeDamage(dmg);
             this.audio.hit();
-            this.vfx.spawnBurst(pos, enemy.stats.color, 6, 5);
+            this.vfx.spawnBurst(pos, p.crit ? '#fbbf24' : enemy.stats.color, p.crit ? 10 : 6, 5);
             if (!died) this.decals.spawnImpact(pos, enemy.stats.color);
-            if (died) this.onEnemyKilled(enemy);
+            if (died) this.onEnemyKilled(enemy, p);
             else this.feel.triggerHitstop(0.03);
-            p.deactivate();
+            if (p.pierce > 0) {
+              p.pierce -= 1;
+            } else {
+              p.deactivate();
+            }
             break;
           }
         }
@@ -584,9 +645,11 @@ export class Game {
         const dz = pos.z - this.player.group.position.z;
         const rr = 0.55 + p.radius;
         if (dx * dx + dz * dz <= rr * rr) {
-          if (this.player.takeDamage(p.damage)) {
+          const hurt = this.player.takeDamage(p.damage);
+          if (hurt.hit) {
             this.lastDeathCause = 'projectile';
             this.onPlayerHurt();
+            if (hurt.shieldBroke) this.maybeShieldNova();
           }
           p.deactivate();
         }
@@ -594,10 +657,13 @@ export class Game {
     }
   }
 
-  private onEnemyKilled(enemy: {
-    stats: { score: number; kind: string; color?: string };
-    group: THREE.Group;
-  }): void {
+  private onEnemyKilled(
+    enemy: {
+      stats: { score: number; kind: string; color?: string };
+      group: THREE.Group;
+    },
+    source?: { sourceWeapon: string | null; damage: number },
+  ): void {
     this.kills += 1;
     this.score += Math.round(enemy.stats.score * this.combo);
     this.combo = Math.min(8, this.combo + 0.15);
@@ -608,6 +674,14 @@ export class Game {
       this.player.stats.ultChargePerKill * (kind === 'boss' ? 12 : kind === 'elite' ? 2.5 : 1),
     );
     this.audio.kill();
+
+    if (this.combatMods.railHeatRefund && source?.sourceWeapon === 'rail') {
+      this.player.coolHeat(this.player.stats.maxHeat * 0.2);
+    }
+
+    if (this.combatMods.arcChain > 0 && kind !== 'boss') {
+      this.spawnArcChains(enemy.group.position, this.combatMods.arcChain);
+    }
 
     const pos = enemy.group.position;
     if (kind === 'boss') this.vfx.killBoss(pos);
@@ -658,6 +732,217 @@ export class Game {
       this.audio.death();
       this.vfx.spawnShockwave(this.player.group.position, '#ff4d6d', 10);
       this.feel.triggerHitstop(0.18);
+    }
+  }
+
+  private setWeapon(id: WeaponId): void {
+    if (this.weapon === id) return;
+    this.captureWeaponBonuses();
+    this.weapon = id;
+    this.syncWeaponStats();
+    const def = WEAPON_DEFS[id];
+    this.hud.setActiveWeapon(id);
+    this.hud.flashPickup(def.name.toUpperCase(), def.color);
+    this.hud.pushKillFeed(`WEAPON · ${def.short}`, 'ranged');
+    this.vfx.spawnBurst(this.player.muzzle, def.color, 6, 4);
+    this.audio.pickupChain(1);
+    this.publishDiagnostics();
+  }
+
+  /** Read retrofit deltas off current player stats relative to the active weapon. */
+  private captureWeaponBonuses(): void {
+    const w = WEAPON_DEFS[this.weapon];
+    this.weaponBonuses.fireMul = this.player.stats.fireInterval / w.fireInterval;
+    this.weaponBonuses.speedMul = this.player.stats.projectileSpeed / w.projectileSpeed;
+    this.weaponBonuses.dmgBonus = this.player.stats.projectileDamage - w.damage;
+  }
+
+  /** Write the active weapon profile + stored retrofit deltas onto player stats. */
+  private syncWeaponStats(): void {
+    const w = WEAPON_DEFS[this.weapon];
+    this.player.stats.fireInterval = Math.max(0.05, w.fireInterval * this.weaponBonuses.fireMul);
+    this.player.stats.heatPerShot = w.heatPerShot;
+    this.player.stats.projectileSpeed = w.projectileSpeed * this.weaponBonuses.speedMul;
+    this.player.stats.projectileDamage = Math.max(1, w.damage + this.weaponBonuses.dmgBonus);
+  }
+
+  private firePlayerWeapon(): void {
+    const w = WEAPON_DEFS[this.weapon];
+    this.audio.shoot();
+    this.tmp.dir.set(this.player.aim.x, 0, this.player.aim.y);
+    const pierce = w.id === 'rail' ? w.pierce + this.combatMods.railPierce : w.pierce;
+    const spread =
+      w.id === 'scatter' && this.combatMods.scatterCloseBonus ? w.spread * 0.72 : w.spread;
+    const up = new THREE.Vector3(0, 1, 0);
+    for (let i = 0; i < w.pellets; i += 1) {
+      const t = w.pellets === 1 ? 0 : i / (w.pellets - 1) - 0.5;
+      const angle = t * spread * 2;
+      const dir = this.tmp.dir.clone().applyAxisAngle(up, angle);
+      this.projectiles.spawn(
+        this.player.muzzle,
+        dir,
+        this.player.stats.projectileSpeed,
+        this.player.stats.projectileDamage,
+        'player',
+        w.color,
+        { pierce, sourceWeapon: w.id },
+      );
+    }
+    this.vfx.spawnBurst(this.player.muzzle, w.color, w.pellets > 1 ? 5 : 3, 3.5);
+    this.vfx.spawnBurst(
+      this.player.muzzle
+        .clone()
+        .add(new THREE.Vector3(-this.player.aim.y, 0.1, this.player.aim.x).multiplyScalar(0.2)),
+      '#fbbf24',
+      1,
+      2.2,
+    );
+    this.feel.triggerFovPunch(w.id === 'rail' ? 2.2 : 1.1);
+  }
+
+  private castOverheatEmp(): void {
+    this.audio.overheat();
+    this.hud.pushKillFeed('OVERHEAT · EMP', 'boss');
+    this.hud.showWaveBanner('EMP CASCADE', true);
+    this.vfx.spawnShockwave(this.player.group.position, '#f97316', OVERHEAT_EMP_RADIUS * 0.7);
+    this.worldFx.triggerPulse(this.player.group.position, '#f97316', OVERHEAT_EMP_RADIUS);
+    this.feel.triggerHitstop(0.1);
+    this.feel.triggerFovPunch(4);
+    const origin = this.player.group.position;
+    for (const enemy of this.waves.enemies) {
+      if (!enemy.alive) continue;
+      const dx = enemy.group.position.x - origin.x;
+      const dz = enemy.group.position.z - origin.z;
+      if (dx * dx + dz * dz <= OVERHEAT_EMP_RADIUS * OVERHEAT_EMP_RADIUS) {
+        enemy.staggerTimer = Math.max(enemy.staggerTimer, 0.55);
+        const died = enemy.takeDamage(OVERHEAT_EMP_DAMAGE);
+        this.vfx.spawnBurst(enemy.group.position.clone().setY(0.4), '#f97316', 8, 5);
+        if (died) this.onEnemyKilled(enemy);
+      }
+    }
+  }
+
+  private spawnArcChains(from: THREE.Vector3, count: number): void {
+    const candidates = this.waves.enemies
+      .filter((e) => e.alive)
+      .map((e) => ({
+        e,
+        d:
+          (e.group.position.x - from.x) * (e.group.position.x - from.x) +
+          (e.group.position.z - from.z) * (e.group.position.z - from.z),
+      }))
+      .filter((c) => c.d > 0.01 && c.d <= ARC_CHAIN_RANGE * ARC_CHAIN_RANGE)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, count);
+
+    for (const { e } of candidates) {
+      let dmg = ARC_CHAIN_DAMAGE;
+      const crit = this.combatMods.critConductor && this.rng() < 0.35;
+      if (crit) dmg *= CRIT_MULTIPLIER;
+      this.vfx.spawnBurst(e.group.position.clone().setY(0.5), crit ? '#fbbf24' : '#38bdf8', 7, 4.5);
+      const died = e.takeDamage(dmg);
+      this.audio.hit();
+      if (died) this.onEnemyKilled(e);
+      else e.staggerTimer = Math.max(e.staggerTimer, 0.12);
+    }
+  }
+
+  private maybeShieldNova(): void {
+    if (!this.combatMods.shieldNova) return;
+    this.hud.pushKillFeed('SHIELD NOVA', 'ranged');
+    this.vfx.spawnShockwave(this.player.group.position, '#3ec6ff', SHIELD_NOVA_RADIUS * 0.75);
+    const origin = this.player.group.position;
+    for (const enemy of this.waves.enemies) {
+      if (!enemy.alive) continue;
+      const dx = enemy.group.position.x - origin.x;
+      const dz = enemy.group.position.z - origin.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > SHIELD_NOVA_RADIUS * SHIELD_NOVA_RADIUS) continue;
+      const dist = Math.max(Math.sqrt(distSq), 0.0001);
+      enemy.knockback(dx / dist, dz / dist, 14, 0.2);
+      const died = enemy.takeDamage(SHIELD_NOVA_DAMAGE);
+      if (died) this.onEnemyKilled(enemy);
+    }
+  }
+
+  private tickDashBlasts(delta: number): void {
+    for (let i = this.dashBlasts.length - 1; i >= 0; i -= 1) {
+      const blast = this.dashBlasts[i];
+      blast.timer -= delta;
+      if (blast.timer > 0) continue;
+      this.vfx.spawnShockwave(blast.pos, '#f472b6', DASH_BLAST_RADIUS * 0.8);
+      this.worldFx.triggerPulse(blast.pos, '#f472b6', DASH_BLAST_RADIUS);
+      this.feel.triggerFovPunch(2);
+      for (const enemy of this.waves.enemies) {
+        if (!enemy.alive) continue;
+        const dx = enemy.group.position.x - blast.pos.x;
+        const dz = enemy.group.position.z - blast.pos.z;
+        if (dx * dx + dz * dz > DASH_BLAST_RADIUS * DASH_BLAST_RADIUS) continue;
+        const died = enemy.takeDamage(DASH_BLAST_DAMAGE);
+        this.vfx.spawnBurst(enemy.group.position.clone().setY(0.4), '#f472b6', 6, 4);
+        if (died) this.onEnemyKilled(enemy);
+      }
+      this.dashBlasts.splice(i, 1);
+    }
+  }
+
+  private updateBossPhase(enemy: Enemy): void {
+    const ratio = enemy.hp / enemy.maxHp;
+    const result = advanceBossPhase(this.bossRuntime, ratio);
+    enemy.bossPhaseColor = result.phase.color;
+    if (!result.changed) return;
+    this.hud.showWaveBanner(`TITAN-07 · ${result.phase.name}`, true);
+    this.hud.pushKillFeed(`BOSS PHASE ${result.phase.id} · ${result.phase.name}`, 'boss');
+    this.feel.triggerHitstop(0.12);
+    this.feel.triggerFovPunch(5);
+    this.worldFx.triggerPulse(enemy.group.position, result.phase.color, 8);
+    this.vfx.spawnBurst(enemy.group.position.clone().setY(0.8), result.phase.color, 22, 8);
+  }
+
+  private tickBossLogic(delta: number): void {
+    const boss = this.waves.boss;
+    if (!boss) {
+      this.lastBossRef = null;
+      return;
+    }
+    if (boss !== this.lastBossRef) {
+      this.bossRuntime = createBossRuntime();
+      this.lastBossRef = boss;
+    }
+    this.updateBossPhase(boss);
+    const phase = getBossPhase(this.bossRuntime.phase);
+    boss.bossPhaseColor = phase.color;
+    // Soft speed bias without mutating shared template stats permanently.
+    // Phase 2/3 add radial rings + summons on top of the existing fan shot.
+    this.bossRuntime.summonTimer -= delta * phase.moveSpeedMul;
+    if (this.bossRuntime.summonTimer <= 0 && phase.summonCount > 0) {
+      this.bossRuntime.summonTimer = phase.summonEvery;
+      for (let i = 0; i < phase.summonCount; i += 1) {
+        this.waves.forceSpawnNear(boss.group.position, 'chaser');
+      }
+      this.hud.pushKillFeed('TITAN REINFORCEMENTS', 'boss');
+    }
+    if (phase.id >= 2) {
+      this.bossRuntime.ringTimer -= delta;
+      if (this.bossRuntime.ringTimer <= 0) {
+        this.bossRuntime.ringTimer = phase.id === 3 ? 2.2 : 3.1;
+        const origin = boss.group.position.clone().setY(0.55);
+        const spokes = phase.id === 3 ? 12 : 8;
+        for (let i = 0; i < spokes; i += 1) {
+          const a = this.bossRuntime.spiralAngle + (i / spokes) * Math.PI * 2;
+          const d = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+          this.projectiles.spawn(
+            origin,
+            d,
+            boss.stats.projectileSpeed * 0.85,
+            boss.stats.projectileDamage * phase.projectileDamageMul * 0.75,
+            'enemy',
+            phase.color,
+          );
+        }
+        this.bossRuntime.spiralAngle += 0.35;
+        this.vfx.spawnBurst(origin, phase.color, 8, 4);
+      }
     }
   }
 
@@ -763,7 +1048,7 @@ export class Game {
   }
 
   private openUpgrade(): void {
-    this.upgradeOffers = rollUpgradeOffers(this.upgradeStacks, () => this.rng());
+    this.upgradeOffers = rollUpgradeOffers(this.upgradeStacks, () => this.rng(), this.weapon);
     if (this.upgradeOffers.length === 0) return;
     this.mode = 'upgrade';
     this.hud.showUpgradeCards(
@@ -787,10 +1072,13 @@ export class Game {
     if (!offer) return;
     const def = getUpgrade(offer.id);
     if (!def) return;
-    def.apply(this.player.stats);
+    def.apply(this.player.stats, this.combatMods);
     this.upgradeStacks[offer.id] = (this.upgradeStacks[offer.id] ?? 0) + 1;
     if (offer.id === 'armor') this.player.heal(20);
     if (offer.id === 'shield_bank') this.player.addShield(15);
+    this.captureWeaponBonuses();
+    this.syncWeaponStats();
+    this.player.overheatEmp = this.combatMods.overheatEmp;
     this.hud.flashPickup(offer.name.toUpperCase(), offer.color);
     this.hud.pushKillFeed(`MOD · ${offer.name}`, 'ranged');
     this.audio.pickupChain(1);
@@ -806,9 +1094,17 @@ export class Game {
     const stacks = this.upgradeStacks;
     const total = Object.values(stacks).reduce((sum, n) => sum + (n ?? 0), 0);
     const weapon =
-      (stacks.overclock ?? 0) + (stacks.he_rounds ?? 0) + (stacks.mag_accel ?? 0);
+      (stacks.overclock ?? 0) +
+      (stacks.mag_accel ?? 0) +
+      (stacks.arc_capacitor ?? 0) +
+      (stacks.overheat_cascade ?? 0) +
+      (stacks.critical_conductor ?? 0) +
+      (stacks.rail_bore ?? 0) +
+      (stacks.rail_reactor ?? 0) +
+      (stacks.scatter_choke ?? 0) +
+      (stacks.dash_detonation ?? 0);
     const defense =
-      (stacks.armor ?? 0) + (stacks.shield_bank ?? 0) + (stacks.reactive_plating ?? 0);
+      (stacks.armor ?? 0) + (stacks.shield_bank ?? 0) + (stacks.shield_nova ?? 0);
     let tier = 0;
     if (total >= 12) tier = 3;
     else if (total >= 7) tier = 2;
@@ -832,10 +1128,19 @@ export class Game {
     this.rng = createSeededRandom(1);
     this.upgradeStacks = {};
     this.upgradeOffers = [];
+    this.weapon = 'plasma';
+    this.weaponBonuses = { fireMul: 1, speedMul: 1, dmgBonus: 0 };
+    resetCombatModifiers(this.combatMods);
+    this.bossRuntime = createBossRuntime();
+    this.lastBossRef = null;
+    this.dashBlasts = [];
     this.hud.hideUpgradeCards();
+    this.hud.setActiveWeapon('plasma');
     this.feel.reset();
     this.player.reset();
     this.player.stats = { ...DEFAULT_PLAYER_STATS, moveSpeed: this.tuning.speed };
+    this.player.overheatEmp = false;
+    this.syncWeaponStats();
     this.player.setFormTier(0);
     this.projectiles.clear();
     this.vfx.reset();
@@ -1544,7 +1849,9 @@ export class Game {
         boss: {
           visible: Boolean(boss),
           hpRatio: boss ? boss.hp / boss.maxHp : 0,
-          name: 'SIEGE CORE',
+          name: boss
+            ? `TITAN-07 · ${getBossPhase(this.bossRuntime.phase).name}`
+            : 'TITAN-07',
         },
         waveBanner: null,
         mode: this.mode,
@@ -1553,6 +1860,7 @@ export class Game {
         deathCause: this.lastDeathCause,
         stress: this.stressMode,
         lowGraphics: this.lowGraphics,
+        weapon: this.weapon,
       },
       delta,
     );
@@ -1632,6 +1940,9 @@ export class Game {
       kills: this.kills,
       stress: this.stressMode,
       upgradeStacks: { ...this.upgradeStacks },
+      weapon: this.weapon,
+      modifiers: modifierIds(this.combatMods),
+      bossPhase: this.waves.boss ? this.bossRuntime.phase : null,
       playerFormTier: this.player.getFormTier(),
       enemyFormTier: enemyFormTierForWave(waveState.wave),
       player: {
@@ -1641,6 +1952,10 @@ export class Game {
         overheated: this.player.overheated,
         ult: this.player.ultCharge,
         alive: this.player.alive,
+        fireInterval: this.player.stats.fireInterval,
+        projectileDamage: this.player.stats.projectileDamage,
+        projectileSpeed: this.player.stats.projectileSpeed,
+        heatPerShot: this.player.stats.heatPerShot,
         position: {
           x: this.player.group.position.x,
           y: this.player.group.position.y,

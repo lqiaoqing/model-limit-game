@@ -10,6 +10,8 @@ export type InputFrame = {
   restartPressed: boolean;
   /** 0/1/2 when Digit1/2/3 pressed this frame; -1 otherwise. */
   upgradeChoice: number;
+  /** 0/1/2 when Digit1/2/3 pressed this frame for weapon swap (play mode). */
+  weaponChoice: number;
 };
 
 type PointerState = {
@@ -37,6 +39,7 @@ export class InputController {
   private pauseQueued = false;
   private restartQueued = false;
   private upgradeQueued = -1;
+  private weaponQueued = -1;
   private fireHeld = false;
   private pointerAimActive = false;
   private readonly raycaster = new THREE.Raycaster();
@@ -52,9 +55,18 @@ export class InputController {
     if (event.code === 'KeyQ') this.ultQueued = true;
     if (event.code === 'KeyP' || event.code === 'Escape') this.pauseQueued = true;
     if (event.code === 'KeyR') this.restartQueued = true;
-    if (event.code === 'Digit1' || event.code === 'Numpad1') this.upgradeQueued = 0;
-    if (event.code === 'Digit2' || event.code === 'Numpad2') this.upgradeQueued = 1;
-    if (event.code === 'Digit3' || event.code === 'Numpad3') this.upgradeQueued = 2;
+    if (event.code === 'Digit1' || event.code === 'Numpad1') {
+      this.upgradeQueued = 0;
+      this.weaponQueued = 0;
+    }
+    if (event.code === 'Digit2' || event.code === 'Numpad2') {
+      this.upgradeQueued = 1;
+      this.weaponQueued = 1;
+    }
+    if (event.code === 'Digit3' || event.code === 'Numpad3') {
+      this.upgradeQueued = 2;
+      this.weaponQueued = 2;
+    }
   };
 
   private readonly onKeyUp = (event: KeyboardEvent) => {
@@ -155,12 +167,14 @@ export class InputController {
     frame.pausePressed = this.pauseQueued;
     frame.restartPressed = this.restartQueued;
     frame.upgradeChoice = this.upgradeQueued;
+    frame.weaponChoice = this.weaponQueued;
 
     this.dashQueued = false;
     this.ultQueued = false;
     this.pauseQueued = false;
     this.restartQueued = false;
     this.upgradeQueued = -1;
+    this.weaponQueued = -1;
     return frame;
   }
 
