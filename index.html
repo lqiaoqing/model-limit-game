@@ -12,6 +12,7 @@
       <canvas id="game-canvas" aria-label="Neon Siege Arena game canvas"></canvas>
       <div id="crosshair" aria-hidden="true"></div>
       <div id="ult-flash" class="hidden" aria-hidden="true"></div>
+      <button id="lang-toggle" type="button" data-i18n="lang.toggle" title="切换语言 / Switch language">EN</button>
 
       <section id="hud" aria-live="polite">
         <!-- Top-left: survival stack (no boxed cards — combat frames) -->
@@ -106,8 +107,6 @@
           </div>
         </div>
 
-        <button id="lang-toggle" type="button" data-i18n="lang.toggle" title="切换语言 / Switch language">EN</button>
-
         <div id="status-line">Eliminate the siege</div>
         <div id="boss-bar" class="hidden">
           <span id="boss-name">SIEGE CORE</span>
@@ -148,6 +147,10 @@
             <label class="toggle">
               <input id="gfx-toggle" type="checkbox" />
               <span data-i18n="toggle.graphics">低画质</span>
+            </label>
+            <label class="toggle">
+              <button id="lang-toggle-overlay" type="button" data-i18n="lang.toggle">EN</button>
+              <span data-i18n="toggle.lang">语言</span>
             </label>
           </div>
           <div class="overlay-actions">

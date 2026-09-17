@@ -77,6 +77,7 @@ export class Hud {
     upgradeTitle: this.el('#upgrade-title'),
     weaponBar: this.el('#weapon-bar'),
     langButton: this.el<HTMLButtonElement>('#lang-toggle'),
+    langButtonOverlay: this.el<HTMLButtonElement>('#lang-toggle-overlay'),
   };
 
   private waveBannerTimer = 0;
@@ -94,7 +95,16 @@ export class Hud {
     this.els.overlaySecondary.addEventListener('click', () => this.onSecondary());
     this.els.stressToggle.addEventListener('change', () => this.onStress(this.els.stressToggle.checked));
     this.els.gfxToggle.addEventListener('change', () => this.onGraphics(this.els.gfxToggle.checked));
-    this.els.langButton.addEventListener('click', () => this.onLocaleToggle());
+    this.els.langButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.onLocaleToggle();
+    });
+    this.els.langButtonOverlay.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.onLocaleToggle();
+    });
 
     const chips = this.els.weaponBar.querySelectorAll<HTMLButtonElement>('.weapon-chip');
     chips.forEach((chip, index) => {

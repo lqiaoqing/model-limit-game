@@ -242,12 +242,8 @@ body {
   font-size: 12px;
 }
 
-/* —— Weapon select chips —— */
-#lang-toggle {
-  position: absolute;
-  bottom: max(12px, env(safe-area-inset-bottom));
-  right: max(12px, env(safe-area-inset-right));
-  z-index: 7;
+#lang-toggle,
+#lang-toggle-overlay {
   min-width: 52px;
   padding: 6px 10px;
   border: 1px solid rgba(34, 211, 238, 0.45);
@@ -258,12 +254,27 @@ body {
   font-weight: 800;
   letter-spacing: 0.12em;
   cursor: pointer;
+  pointer-events: auto;
   clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
   transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
 }
 
+#lang-toggle {
+  position: absolute;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 20;
+}
+
+#lang-toggle-overlay {
+  position: static;
+  margin-right: 8px;
+}
+
 #lang-toggle:hover,
-#lang-toggle:focus-visible {
+#lang-toggle:focus-visible,
+#lang-toggle-overlay:hover,
+#lang-toggle-overlay:focus-visible {
   border-color: #22d3ee;
   color: #e8eef7;
   outline: none;
@@ -277,6 +288,7 @@ body {
   display: flex;
   gap: 6px;
   z-index: 5;
+  pointer-events: auto;
 }
 
 .weapon-chip {
