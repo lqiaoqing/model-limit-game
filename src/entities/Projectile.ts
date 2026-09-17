@@ -1,6 +1,52 @@
 import * as THREE from 'three';
 
 export type ProjectileOwner = 'player' | 'enemy';
+export type ProjectileStyle = 'plasma' | 'rail' | 'scatter' | 'enemy';
+
+/** Visual + hitbox profile per weapon so shots read differently at a glance. */
+const STYLE_PROFILES: Record<
+  ProjectileStyle,
+  {
+    coreScale: [number, number, number];
+    trailScale: [number, number, number];
+    trailOffsetZ: number;
+    trailOpacity: number;
+    radius: number;
+  }
+> = {
+  // Round energy bolt, medium streak
+  plasma: {
+    coreScale: [1.05, 1.05, 1.2],
+    trailScale: [0.9, 0.9, 1.4],
+    trailOffsetZ: 0.42,
+    trailOpacity: 0.5,
+    radius: 0.13,
+  },
+  // Long thin rail slug — needle + long tracer
+  rail: {
+    coreScale: [0.55, 0.55, 2.4],
+    trailScale: [0.35, 0.35, 3.2],
+    trailOffsetZ: 0.9,
+    trailOpacity: 0.72,
+    radius: 0.1,
+  },
+  // Compact pink pellet — short stubby burst
+  scatter: {
+    coreScale: [1.25, 1.25, 0.85],
+    trailScale: [0.75, 0.75, 0.7],
+    trailOffsetZ: 0.28,
+    trailOpacity: 0.4,
+    radius: 0.11,
+  },
+  // Enemy shots — larger violet orb
+  enemy: {
+    coreScale: [1.4, 1.4, 1.35],
+    trailScale: [1.1, 1.1, 1.1],
+    trailOffsetZ: 0.35,
+    trailOpacity: 0.4,
+    radius: 0.16,
+  },
+};
 
 export class Projectile {
   readonly group = new THREE.Group();
@@ -26,7 +72,8 @@ export class Projectile {
   private readonly trailMat: THREE.MeshBasicMaterial;
 
   constructor() {
-    this.coreGeo = new THREE.SphereGeometry(0.11, 8, 8);
+    // Unit geometry — profile scales applied per shot.
+    this.coreGeo = new THREE.SphereGeometry(0.11, 10, 8);
     this.trailGeo = new THREE.BoxGeometry(0.06, 0.06, 0.55);
     this.coreMat = new THREE.MeshBasicMaterial({ color: '#22d3ee' });
     this.trailMat = new THREE.MeshBasicMaterial({
@@ -50,13 +97,24 @@ export class Projectile {
     color: string,
     extras?: { pierce?: number; crit?: boolean; sourceWeapon?: string | null },
   ): void {
+    const weapon = extras?.sourceWeapon;
+    const style: ProjectileStyle =
+      owner === 'enemy'
+        ? 'enemy'
+        : weapon === 'rail'
+          ? 'rail'
+          : weapon === 'scatter'
+            ? 'scatter'
+            : 'plasma';
+    const profile = STYLE_PROFILES[style];
+
     this.active = true;
-    this.life = 2.2;
+    this.life = style === 'rail' ? 2.6 : 2.2;
     this.damage = damage;
     this.owner = owner;
     this.pierce = extras?.pierce ?? 0;
     this.crit = extras?.crit ?? false;
-    this.sourceWeapon = extras?.sourceWeapon ?? null;
+    this.sourceWeapon = weapon ?? null;
     this.hitSet.clear();
     this.hitsLanded = 0;
     this.group.visible = true;
@@ -64,11 +122,21 @@ export class Projectile {
     this.velocity.copy(direction).normalize().multiplyScalar(speed);
     this.coreMat.color.set(color);
     this.trailMat.color.set(color);
-    this.radius = owner === 'player' ? 0.12 : 0.16;
-    const scale = owner === 'player' ? 1 : 1.35;
-    this.core.scale.setScalar(scale);
-    this.trail.scale.set(scale, scale, scale * 1.2);
-    // Orient trail along velocity
+    this.trailMat.opacity = profile.trailOpacity;
+    this.radius = profile.radius;
+
+    const [cx, cy, cz] = profile.coreScale;
+    this.core.scale.set(cx, cy, cz);
+    const [tx, ty, tz] = profile.trailScale;
+    this.trail.scale.set(tx, ty, tz);
+    this.trail.position.z = profile.trailOffsetZ;
+
+    // Crit hits glow hotter / slightly fatter core
+    if (this.crit) {
+      this.core.scale.multiplyScalar(1.25);
+      this.trailMat.opacity = Math.min(1, profile.trailOpacity + 0.25);
+    }
+
     this.group.rotation.set(0, 0, 0);
     const dir = this.velocity.clone().normalize();
     this.group.lookAt(this.group.position.clone().add(dir));

@@ -93,13 +93,16 @@ export class CombatSystem {
       );
     }
     this.deps.onShot?.(resolved.pellets, resolved.def.id);
-    vfx.spawnBurst(player.muzzle, resolved.color, resolved.pellets > 1 ? 5 : 3, 3.5);
+    const weaponId = resolved.def.id;
+    const burstCount = weaponId === 'scatter' ? 8 : weaponId === 'rail' ? 6 : 3;
+    const burstSpeed = weaponId === 'rail' ? 6.5 : weaponId === 'scatter' ? 4.2 : 3.5;
+    vfx.spawnBurst(player.muzzle, resolved.color, burstCount, burstSpeed);
     vfx.spawnBurst(
       player.muzzle
         .clone()
         .add(new THREE.Vector3(-player.aim.y, 0.1, player.aim.x).multiplyScalar(0.2)),
-      '#fbbf24',
-      1,
+      resolved.color,
+      weaponId === 'rail' ? 3 : 1,
       2.2,
     );
     feel.triggerFovPunch(resolved.def.id === 'rail' ? 2.2 : 1.1);
