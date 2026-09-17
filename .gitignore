@@ -13,3 +13,5 @@ artifacts/screens/
 artifacts/screens2/
 artifacts/screens-final/
 artifacts/evidence-run/
+# Keep balance report/latest; ignore timestamped reruns
+artifacts/balance/balance-*.json

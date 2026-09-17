@@ -1,0 +1,512 @@
+{
+  "meta": {
+    "generatedAt": "2026-09-17T06:11:37.075Z",
+    "seeds": [
+      42,
+      137,
+      999,
+      2026,
+      65535
+    ],
+    "durationSec": 12,
+    "pageErrors": []
+  },
+  "aggregate": {
+    "meanDps": 0.41,
+    "weaponRows": [
+      {
+        "weapon": "plasma",
+        "runs": 5,
+        "killsAvg": 4.6,
+        "scoreAvg": 501,
+        "dpsAvg": 0.38,
+        "deathsAvg": 0,
+        "overheatedRatioAvg": 0,
+        "fpsAvg": 59.9,
+        "fpsP50Avg": 60,
+        "fpsP95Avg": 60,
+        "balanceNote": "ok"
+      },
+      {
+        "weapon": "rail",
+        "runs": 5,
+        "killsAvg": 4.4,
+        "scoreAvg": 468,
+        "dpsAvg": 0.36,
+        "deathsAvg": 0,
+        "overheatedRatioAvg": 0,
+        "fpsAvg": 59.9,
+        "fpsP50Avg": 60,
+        "fpsP95Avg": 60,
+        "balanceNote": "ok"
+      },
+      {
+        "weapon": "scatter",
+        "runs": 5,
+        "killsAvg": 6,
+        "scoreAvg": 647,
+        "dpsAvg": 0.49,
+        "deathsAvg": 0,
+        "overheatedRatioAvg": 0,
+        "fpsAvg": 59.9,
+        "fpsP50Avg": 60,
+        "fpsP95Avg": 60,
+        "balanceNote": "ok"
+      }
+    ],
+    "upgradePickCounts": {},
+    "totalRuns": 15
+  },
+  "runs": [
+    {
+      "seed": 42,
+      "weapon": "plasma",
+      "wallSec": 12.19,
+      "kills": 4,
+      "score": 400,
+      "dps": 0.33,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 87,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.11,
+        "projectileDamage": 12
+      },
+      "perf": {
+        "fpsAvg": 59.9,
+        "fpsP50": 60,
+        "fpsP95": 60,
+        "fpsMin": 57.59539236861054,
+        "projectilesEnd": 2,
+        "particlesEnd": 77,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 42,
+      "weapon": "rail",
+      "wallSec": 12.33,
+      "kills": 5,
+      "score": 530,
+      "dps": 0.41,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 78,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.42,
+        "projectileDamage": 34
+      },
+      "perf": {
+        "fpsAvg": 59.9,
+        "fpsP50": 60,
+        "fpsP95": 60,
+        "fpsMin": 57.62304921968787,
+        "projectilesEnd": 1,
+        "particlesEnd": 11,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 42,
+      "weapon": "scatter",
+      "wallSec": 12.2,
+      "kills": 6,
+      "score": 680,
+      "dps": 0.49,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 87,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.38,
+        "projectileDamage": 7
+      },
+      "perf": {
+        "fpsAvg": 60,
+        "fpsP50": 60,
+        "fpsP95": 60,
+        "fpsMin": 59.966418805468734,
+        "projectilesEnd": 1,
+        "particlesEnd": 27,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 137,
+      "weapon": "plasma",
+      "wallSec": 12.12,
+      "kills": 4,
+      "score": 415,
+      "dps": 0.33,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 78,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.11,
+        "projectileDamage": 12
+      },
+      "perf": {
+        "fpsAvg": 60,
+        "fpsP50": 60,
+        "fpsP95": 60,
+        "fpsMin": 59.95503372470601,
+        "projectilesEnd": 0,
+        "particlesEnd": 80,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 137,
+      "weapon": "rail",
+      "wallSec": 12.05,
+      "kills": 3,
+      "score": 315,
+      "dps": 0.25,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 78,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.42,
+        "projectileDamage": 34
+      },
+      "perf": {
+        "fpsAvg": 60,
+        "fpsP50": 60,
+        "fpsP95": 60,
+        "fpsMin": 59.95503372470709,
+        "projectilesEnd": 0,
+        "particlesEnd": 11,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 137,
+      "weapon": "scatter",
+      "wallSec": 12.05,
+      "kills": 6,
+      "score": 660,
+      "dps": 0.5,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.38,
+        "projectileDamage": 7
+      },
+      "perf": {
+        "fpsAvg": 60,
+        "fpsP50": 60,
+        "fpsP95": 60,
+        "fpsMin": 59.955033724706006,
+        "projectilesEnd": 2,
+        "particlesEnd": 78,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 999,
+      "weapon": "plasma",
+      "wallSec": 12.12,
+      "kills": 4,
+      "score": 415,
+      "dps": 0.33,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 69,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.11,
+        "projectileDamage": 12
+      },
+      "perf": {
+        "fpsAvg": 60,
+        "fpsP50": 60,
+        "fpsP95": 60,
+        "fpsMin": 59.970014992501994,
+        "projectilesEnd": 0,
+        "particlesEnd": 63,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 999,
+      "weapon": "rail",
+      "wallSec": 12.32,
+      "kills": 5,
+      "score": 515,
+      "dps": 0.41,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 60,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.42,
+        "projectileDamage": 34
+      },
+      "perf": {
+        "fpsAvg": 60,
+        "fpsP50": 60,
+        "fpsP95": 60,
+        "fpsMin": 59.94005994005861,
+        "projectilesEnd": 0,
+        "particlesEnd": 22,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 999,
+      "weapon": "scatter",
+      "wallSec": 12.12,
+      "kills": 5,
+      "score": 515,
+      "dps": 0.41,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 87,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.38,
+        "projectileDamage": 7
+      },
+      "perf": {
+        "fpsAvg": 60,
+        "fpsP50": 60,
+        "fpsP95": 60,
+        "fpsMin": 59.97001499250416,
+        "projectilesEnd": 0,
+        "particlesEnd": 42,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 2026,
+      "weapon": "plasma",
+      "wallSec": 12.05,
+      "kills": 6,
+      "score": 665,
+      "dps": 0.5,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.11,
+        "projectileDamage": 12
+      },
+      "perf": {
+        "fpsAvg": 60,
+        "fpsP50": 60,
+        "fpsP95": 60,
+        "fpsMin": 59.97001499250416,
+        "projectilesEnd": 1,
+        "particlesEnd": 56,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 2026,
+      "weapon": "rail",
+      "wallSec": 12.14,
+      "kills": 6,
+      "score": 630,
+      "dps": 0.49,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 60,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.42,
+        "projectileDamage": 34
+      },
+      "perf": {
+        "fpsAvg": 60,
+        "fpsP50": 60,
+        "fpsP95": 60,
+        "fpsMin": 59.98500374906184,
+        "projectilesEnd": 1,
+        "particlesEnd": 21,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 2026,
+      "weapon": "scatter",
+      "wallSec": 12.19,
+      "kills": 8,
+      "score": 830,
+      "dps": 0.66,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 78,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.38,
+        "projectileDamage": 7
+      },
+      "perf": {
+        "fpsAvg": 59.5,
+        "fpsP50": 60,
+        "fpsP95": 60.1,
+        "fpsMin": 54.99999999999997,
+        "projectilesEnd": 9,
+        "particlesEnd": 26,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 65535,
+      "weapon": "plasma",
+      "wallSec": 12.3,
+      "kills": 5,
+      "score": 610,
+      "dps": 0.41,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 69,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.11,
+        "projectileDamage": 12
+      },
+      "perf": {
+        "fpsAvg": 59.7,
+        "fpsP50": 60,
+        "fpsP95": 60,
+        "fpsMin": 57.49999999999997,
+        "projectilesEnd": 3,
+        "particlesEnd": 43,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 65535,
+      "weapon": "rail",
+      "wallSec": 12.17,
+      "kills": 3,
+      "score": 350,
+      "dps": 0.25,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 69,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.42,
+        "projectileDamage": 34
+      },
+      "perf": {
+        "fpsAvg": 59.6,
+        "fpsP50": 60,
+        "fpsP95": 60,
+        "fpsMin": 57.48562859285093,
+        "projectilesEnd": 1,
+        "particlesEnd": 12,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 65535,
+      "weapon": "scatter",
+      "wallSec": 12.1,
+      "kills": 5,
+      "score": 550,
+      "dps": 0.41,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 51,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.38,
+        "projectileDamage": 7
+      },
+      "perf": {
+        "fpsAvg": 60,
+        "fpsP50": 60,
+        "fpsP95": 60,
+        "fpsMin": 59.97001499250197,
+        "projectilesEnd": 2,
+        "particlesEnd": 71,
+        "backend": "webgl2"
+      }
+    }
+  ]
+}

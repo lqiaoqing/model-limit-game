@@ -124,6 +124,7 @@ export class Game {
   private peakCombo = 1;
   private comboTimer = 0;
   private mode: 'play' | 'paused' | 'dead' | 'upgrade' = 'play';
+  private rngSeed = 1;
   private rng = createSeededRandom(1);
   private pausedForScreenshot = false;
   private reducedMotion = false;
@@ -943,7 +944,7 @@ export class Game {
     this.mode = 'play';
     this.lastWaveShown = 0;
     this.lastEnemyFormTier = 0;
-    this.rng = createSeededRandom(1);
+    this.rng = createSeededRandom(this.rngSeed);
     this.upgradeStacks = {};
     this.upgradeOffers = [];
     this.weapon = 'plasma';
@@ -1702,6 +1703,7 @@ export class Game {
   private installTestHooks(): void {
     window.__THREE_GAME_TEST_HOOKS__ = {
       seed: (value: number) => {
+        this.rngSeed = value;
         this.rng = createSeededRandom(value);
       },
       setState: (name: string) => {

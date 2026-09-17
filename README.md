@@ -58,6 +58,7 @@ Requires `navigator.gpu`. Diagnostics include `backend` and `webgpuSupported`.
 | `npm run preview` | Serve production build |
 | `npm run inspect:canvas` | Canvas pixel + render-budget inspection |
 | `npm run test` | Playwright tests (desktop uses system Chrome via `channel: 'chrome'`) |
+| `npm run balance` | Multi-seed bot telemetry → `artifacts/balance/balance-report.md` |
 
 ### Canvas inspector (optional)
 
