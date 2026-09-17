@@ -31,6 +31,8 @@ export class WaveDirector {
 
   wave = 1;
   stressMode = false;
+  /** Debug: skip enemy AI/movement updates. */
+  freezeEnemies = false;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -130,12 +132,41 @@ export class WaveDirector {
     }
 
     for (const enemy of this.enemies) {
+      if (this.freezeEnemies) continue;
       enemy.update(delta, elapsed, playerPos, this.bounds);
     }
   }
 
   forceStartWave(playerPos?: THREE.Vector3): void {
     this.intermission = 0;
+    this.beginWave();
+    if (playerPos && this.stressMode) {
+      for (let i = 0; i < 48; i += 1) {
+        this.spawnEnemyAt('chaser', playerPos.x, playerPos.z, true);
+      }
+    }
+  }
+
+  /** Debug: wipe current wave (enemies + queue) and advance wave counter. */
+  debugClearWave(): void {
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      e.takeDamage(999999);
+    }
+    this.spawnQueue = [];
+    this.wave += 1;
+    this.intermission = 0.08;
+    this.bossRef = null;
+  }
+
+  /** Debug: force a specific wave number and restart its spawn. */
+  debugSetWave(wave: number, playerPos?: THREE.Vector3): void {
+    this.wave = Math.max(1, wave);
+    this.debugClearWave();
+    // undo the auto +1 from clear so caller sets exact wave
+    this.wave = Math.max(1, wave);
+    this.spawnQueue = [];
+    this.intermission = 0.05;
     this.beginWave();
     if (playerPos && this.stressMode) {
       for (let i = 0; i < 48; i += 1) {

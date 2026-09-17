@@ -56,16 +56,22 @@ export class InputController {
     if (event.code === 'KeyP' || event.code === 'Escape') this.pauseQueued = true;
     if (event.code === 'KeyR') this.restartQueued = true;
     if (event.code === 'Digit1' || event.code === 'Numpad1') {
-      this.upgradeQueued = 0;
-      this.weaponQueued = 0;
+      if (!event.repeat) {
+        this.upgradeQueued = 0;
+        this.weaponQueued = 0;
+      }
     }
     if (event.code === 'Digit2' || event.code === 'Numpad2') {
-      this.upgradeQueued = 1;
-      this.weaponQueued = 1;
+      if (!event.repeat) {
+        this.upgradeQueued = 1;
+        this.weaponQueued = 1;
+      }
     }
     if (event.code === 'Digit3' || event.code === 'Numpad3') {
-      this.upgradeQueued = 2;
-      this.weaponQueued = 2;
+      if (!event.repeat) {
+        this.upgradeQueued = 2;
+        this.weaponQueued = 2;
+      }
     }
   };
 
@@ -118,11 +124,16 @@ export class InputController {
     this.updateKnob();
   };
 
-  private readonly onActionDown = (kind: 'dash' | 'ult') => (event: PointerEvent) => {
+  private readonly onDashDown = (event: PointerEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    if (kind === 'dash') this.dashQueued = true;
-    else this.ultQueued = true;
+    this.dashQueued = true;
+  };
+
+  private readonly onUltDown = (event: PointerEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    this.ultQueued = true;
   };
 
   constructor(
@@ -145,8 +156,8 @@ export class InputController {
     this.stick.addEventListener('pointerup', this.onStickUp);
     this.stick.addEventListener('pointercancel', this.onStickUp);
 
-    this.dashButton.addEventListener('pointerdown', this.onActionDown('dash'));
-    this.ultButton.addEventListener('pointerdown', this.onActionDown('ult'));
+    this.dashButton.addEventListener('pointerdown', this.onDashDown);
+    this.ultButton.addEventListener('pointerdown', this.onUltDown);
   }
 
   read(frame: InputFrame): InputFrame {
@@ -189,8 +200,8 @@ export class InputController {
     this.stick.removeEventListener('pointermove', this.onStickMove);
     this.stick.removeEventListener('pointerup', this.onStickUp);
     this.stick.removeEventListener('pointercancel', this.onStickUp);
-    this.dashButton.removeEventListener('pointerdown', this.onActionDown('dash'));
-    this.ultButton.removeEventListener('pointerdown', this.onActionDown('ult'));
+    this.dashButton.removeEventListener('pointerdown', this.onDashDown);
+    this.ultButton.removeEventListener('pointerdown', this.onUltDown);
   }
 
   private updateStick(clientX: number, clientY: number): void {

@@ -1,6 +1,9 @@
 import './styles.css';
 import { Game } from './game/Game';
 import { createRenderBackendAsync, initRenderBackend } from './core/RenderBackend';
+import { applyStaticLocale } from './i18n';
+
+applyStaticLocale();
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game-canvas');
 

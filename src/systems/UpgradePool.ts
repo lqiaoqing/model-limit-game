@@ -2,6 +2,7 @@ import type { PlayerStats } from '../entities/Player';
 import type { CombatBuild } from '../combat/CombatBuild';
 import type { CombatModifiers } from '../combat/CombatModifiers';
 import type { WeaponId } from '../combat/Weapons';
+import { upgradeText } from '../i18n';
 
 export type UpgradeId =
   | 'overclock'
@@ -29,8 +30,6 @@ export type UpgradeApplyCtx = {
 
 export type UpgradeDef = {
   id: UpgradeId;
-  name: string;
-  desc: string;
   color: string;
   maxStacks: number;
   weaponAffinity?: WeaponId;
@@ -40,8 +39,6 @@ export type UpgradeDef = {
 export const UPGRADE_POOL: UpgradeDef[] = [
   {
     id: 'overclock',
-    name: 'Overclock',
-    desc: 'Fire rate +10% (all weapons)',
     color: '#22d3ee',
     maxStacks: 4,
     apply: ({ build }) => {
@@ -50,8 +47,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
   },
   {
     id: 'thrusters',
-    name: 'Thrusters',
-    desc: 'Move speed +0.45',
     color: '#7ae7ff',
     maxStacks: 4,
     apply: ({ stats }) => {
@@ -60,8 +55,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
   },
   {
     id: 'armor',
-    name: 'Armor Plate',
-    desc: 'Max hull +20 · repair 20',
     color: '#ff4d6d',
     maxStacks: 5,
     apply: ({ stats }) => {
@@ -70,8 +63,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
   },
   {
     id: 'shield_bank',
-    name: 'Shield Bank',
-    desc: 'Max shield +15 · charge 15',
     color: '#3ec6ff',
     maxStacks: 4,
     apply: ({ stats }) => {
@@ -80,8 +71,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
   },
   {
     id: 'coolant_loop',
-    name: 'Coolant Loop',
-    desc: 'Heat cooling +7/s',
     color: '#4ade80',
     maxStacks: 4,
     apply: ({ stats }) => {
@@ -91,8 +80,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
   },
   {
     id: 'capacitor',
-    name: 'Capacitor',
-    desc: 'Max heat +12',
     color: '#a78bfa',
     maxStacks: 3,
     apply: ({ stats }) => {
@@ -101,8 +88,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
   },
   {
     id: 'dash_servos',
-    name: 'Dash Servos',
-    desc: 'Dash cooldown −12%',
     color: '#22d3ee',
     maxStacks: 4,
     apply: ({ stats }) => {
@@ -111,8 +96,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
   },
   {
     id: 'mag_accel',
-    name: 'Mag Accelerator',
-    desc: 'Projectile speed +8% (all weapons)',
     color: '#94a3b8',
     maxStacks: 4,
     apply: ({ build }) => {
@@ -121,8 +104,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
   },
   {
     id: 'arc_capacitor',
-    name: 'Arc Capacitor',
-    desc: 'Kills chain lightning to +1 nearby',
     color: '#38bdf8',
     maxStacks: 2,
     weaponAffinity: 'plasma',
@@ -132,8 +113,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
   },
   {
     id: 'overheat_cascade',
-    name: 'Overheat Cascade',
-    desc: 'Overheat becomes EMP blast',
     color: '#f97316',
     maxStacks: 1,
     weaponAffinity: 'plasma',
@@ -143,8 +122,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
   },
   {
     id: 'critical_conductor',
-    name: 'Critical Conductor',
-    desc: 'Chain hits may crit ×1.5',
     color: '#e879f9',
     maxStacks: 1,
     weaponAffinity: 'plasma',
@@ -154,8 +131,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
   },
   {
     id: 'rail_bore',
-    name: 'Rail Bore',
-    desc: 'Rail pierce +1 · rail damage +2 only',
     color: '#fbbf24',
     maxStacks: 2,
     weaponAffinity: 'rail',
@@ -166,8 +141,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
   },
   {
     id: 'rail_reactor',
-    name: 'Rail Reactor',
-    desc: 'Rail kills refund 20% heat',
     color: '#f59e0b',
     maxStacks: 1,
     weaponAffinity: 'rail',
@@ -177,8 +150,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
   },
   {
     id: 'scatter_choke',
-    name: 'Scatter Choke',
-    desc: 'Scatter tighter + close bonus only',
     color: '#f472b6',
     maxStacks: 2,
     weaponAffinity: 'scatter',
@@ -190,8 +161,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
   },
   {
     id: 'dash_detonation',
-    name: 'Dash Detonation',
-    desc: 'Dash leaves a delayed blast',
     color: '#22d3ee',
     maxStacks: 1,
     weaponAffinity: 'scatter',
@@ -201,8 +170,6 @@ export const UPGRADE_POOL: UpgradeDef[] = [
   },
   {
     id: 'shield_nova',
-    name: 'Shield Nova',
-    desc: 'Shield break emits a nova',
     color: '#3ec6ff',
     maxStacks: 1,
     apply: ({ mods }) => {
@@ -246,7 +213,8 @@ export function rollUpgradeOffers(
       }
     }
     const [picked] = bag.splice(idx, 1);
-    offers.push({ id: picked.id, name: picked.name, desc: picked.desc, color: picked.color });
+    const text = upgradeText(picked.id);
+    offers.push({ id: picked.id, name: text.name, desc: text.desc, color: picked.color });
   }
   return offers;
 }

@@ -22,7 +22,7 @@
               <circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/>
             </svg>
             <div class="meter-body">
-              <div class="meter-meta"><span>HULL</span><span id="hp-text" class="tabular">100</span></div>
+              <div class="meter-meta"><span data-i18n="label.hull">装甲</span><span id="hp-text" class="tabular">100</span></div>
               <div class="meter-track"><div id="hp-fill" class="meter-fill hp"></div></div>
             </div>
           </div>
@@ -31,7 +31,7 @@
               <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z" fill="none" stroke="currentColor" stroke-width="1.7"/>
             </svg>
             <div class="meter-body">
-              <div class="meter-meta"><span>SHIELD</span><span id="shield-text" class="tabular">50</span></div>
+              <div class="meter-meta"><span data-i18n="label.shield">护盾</span><span id="shield-text" class="tabular">50</span></div>
               <div class="meter-track"><div id="shield-fill" class="meter-fill shield"></div></div>
             </div>
           </div>
@@ -40,7 +40,7 @@
               <path d="M12 3c2 4 1 6 1 8a5 5 0 11-10 0c0-3 3-6 5-9 1 2 2 4 4 6z" fill="none" stroke="currentColor" stroke-width="1.6"/>
             </svg>
             <div class="meter-body">
-              <div class="meter-meta"><span>HEAT</span><span id="heat-text" class="tabular">0%</span></div>
+              <div class="meter-meta"><span data-i18n="label.heat">热量</span><span id="heat-text" class="tabular">0%</span></div>
               <div class="meter-track heat-track"><div id="heat-fill" class="meter-fill heat"></div><div class="heat-danger"></div></div>
             </div>
           </div>
@@ -49,17 +49,17 @@
         <!-- Top-center: mission strip -->
         <div class="hud-frame mission">
           <div class="mission-item">
-            <span class="mission-label">WAVE</span>
+            <span class="mission-label" data-i18n="label.wave">波次</span>
             <strong id="wave-value" class="tabular">1</strong>
           </div>
           <div class="mission-divider"></div>
           <div class="mission-item">
-            <span class="mission-label">TIME</span>
+            <span class="mission-label" data-i18n="label.time">时间</span>
             <strong id="timer-value" class="tabular">00:00</strong>
           </div>
           <div class="mission-divider"></div>
           <div class="mission-item">
-            <span class="mission-label">SCORE</span>
+            <span class="mission-label" data-i18n="label.score">分数</span>
             <strong id="score-value" class="tabular">0</strong>
           </div>
           <div id="stress-badge" class="hidden">STRESS</div>
@@ -84,7 +84,7 @@
         <!-- Top-right: combat feedback cluster -->
         <div class="hud-frame combat">
           <div id="combo-block" class="combo-readout">
-            <span class="combo-label">COMBO</span>
+            <span class="combo-label" data-i18n="label.combo">连击</span>
             <strong id="combo-value" class="tabular">×1.0</strong>
             <div class="combo-pips" id="combo-pips" aria-hidden="true"></div>
           </div>
@@ -94,17 +94,19 @@
               <circle id="ult-ring-fill" class="ult-ring-fill" cx="24" cy="24" r="18"/>
             </svg>
             <span class="ult-key">Q</span>
-            <span class="ult-label">ULT</span>
+            <span class="ult-label" data-i18n="label.ult">大招</span>
             <div id="ult-fill" class="sr-only"></div>
           </div>
           <div class="foes-readout">
             <svg class="foes-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 18l4-10 4 6 4-8 4 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
             </svg>
-            <span>FOES</span>
+            <span data-i18n="label.foes">敌军</span>
             <strong id="enemies-value" class="tabular">0</strong>
           </div>
         </div>
+
+        <button id="lang-toggle" type="button" data-i18n="lang.toggle" title="切换语言 / Switch language">EN</button>
 
         <div id="status-line">Eliminate the siege</div>
         <div id="boss-bar" class="hidden">
@@ -135,33 +137,33 @@
 
       <div id="overlay" class="hidden">
         <div class="panel">
-          <h1 id="overlay-title">PAUSED</h1>
-          <p id="overlay-sub">Neon Siege Arena</p>
+          <h1 id="overlay-title">已暂停</h1>
+          <p id="overlay-sub">霓虹攻城竞技场</p>
           <div id="overlay-stats" class="stats"></div>
           <div class="toggles">
             <label class="toggle">
               <input id="stress-toggle" type="checkbox" />
-              <span>极限压力 Stress（敌潮拉满）</span>
+              <span data-i18n="toggle.stress">极限压力（敌潮拉满）</span>
             </label>
             <label class="toggle">
               <input id="gfx-toggle" type="checkbox" />
-              <span>低画质 Low Graphics</span>
+              <span data-i18n="toggle.graphics">低画质</span>
             </label>
           </div>
           <div class="overlay-actions">
-            <button id="overlay-primary" type="button">Resume</button>
-            <button id="overlay-secondary" type="button">Restart</button>
+            <button id="overlay-primary" type="button">继续</button>
+            <button id="overlay-secondary" type="button">重开</button>
           </div>
-          <p class="hint">WASD 移动 · 鼠标瞄准 · 按住射击 · Shift 冲刺 · Q 大招 · P 暂停 · R 重开</p>
+          <p class="hint" data-i18n="overlay.hint">WASD 移动 · 鼠标瞄准 · 按住射击 · Shift 冲刺 · Q 大招 · P 暂停 · R 重开</p>
         </div>
       </div>
 
       <div id="upgrade-panel" class="hidden" role="dialog" aria-label="Choose upgrade">
         <div class="upgrade-shell">
           <div class="upgrade-header">
-            <span class="upgrade-kicker">WAVE CLEARED</span>
-            <h2 id="upgrade-title">Select Retrofit</h2>
-            <p id="upgrade-sub">Pick one module · 1 / 2 / 3</p>
+            <span class="upgrade-kicker" data-i18n="upgrade.kicker">波次清除</span>
+            <h2 id="upgrade-title">选择改装</h2>
+            <p id="upgrade-sub" data-i18n="upgrade.sub">选择一个模块 · 按 1 / 2 / 3</p>
           </div>
           <div id="upgrade-cards" class="upgrade-cards"></div>
         </div>

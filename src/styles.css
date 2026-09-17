@@ -210,7 +210,65 @@ body {
   clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
 }
 
+#debug-trigger {
+  position: absolute;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 20;
+  min-width: 48px;
+  padding: 6px 10px;
+  border: 1px solid rgba(167, 139, 250, 0.55);
+  background: rgba(20, 12, 32, 0.82);
+  color: #c4b5fd;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+#debug-trigger:hover,
+#debug-trigger:focus-visible,
+#debug-trigger.active {
+  border-color: #a78bfa;
+  color: #ede9fe;
+  outline: none;
+}
+
+.lil-gui.debug-panel {
+  --width: 300px;
+  font-size: 12px;
+}
+
 /* —— Weapon select chips —— */
+#lang-toggle {
+  position: absolute;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 7;
+  min-width: 52px;
+  padding: 6px 10px;
+  border: 1px solid rgba(34, 211, 238, 0.45);
+  background: rgba(6, 12, 18, 0.78);
+  color: #7ae7ff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+#lang-toggle:hover,
+#lang-toggle:focus-visible {
+  border-color: #22d3ee;
+  color: #e8eef7;
+  outline: none;
+}
+
 .weapon-bar {
   position: absolute;
   top: max(78px, calc(env(safe-area-inset-top) + 66px));

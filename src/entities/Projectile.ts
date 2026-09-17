@@ -99,7 +99,7 @@ export class ProjectilePool {
 
   constructor(
     private readonly scene: THREE.Scene,
-    size = 180,
+    size = 280,
   ) {
     for (let i = 0; i < size; i += 1) {
       const p = new Projectile();

@@ -16,12 +16,13 @@ import { PostFx } from '../systems/PostFx';
 import { VfxSystem } from '../systems/VfxSystem';
 import { WorldFx } from '../systems/WorldFx';
 import { WaveDirector } from '../systems/WaveDirector';
-import { DebugTools, type DebugTuning } from '../systems/DebugTools';
+import { DebugTools, createDebugFlags, type DebugFlags, type DebugTuning } from '../systems/DebugTools';
 import { EnemyBatchRenderer } from '../systems/EnemyBatchRenderer';
 import { disposeEnemyAssets } from '../systems/EnemyAssets';
 import {
   getUpgrade,
   rollUpgradeOffers,
+  UPGRADE_POOL,
   type UpgradeId,
   type UpgradeOffer,
 } from '../systems/UpgradePool';
@@ -38,6 +39,7 @@ import {
   type BossRuntime,
 } from '../systems/BossPhases';
 import { buildDiagnostics } from '../telemetry/buildDiagnostics';
+import { bossPhaseName, t, toggleLocale, upgradeText, weaponName } from '../i18n';
 
 const ARENA: ArenaBounds = {
   halfWidth: 14,
@@ -99,6 +101,7 @@ export class Game {
   };
 
   private readonly debugTools: DebugTools;
+  private readonly debugFlags: DebugFlags = createDebugFlags();
   private readonly inputFrame: InputFrame = {
     move: new THREE.Vector2(),
     aim: new THREE.Vector2(),
@@ -199,6 +202,9 @@ export class Game {
       },
       onDamageDealt: (amount, weapon) => this.recordDamage(amount, weapon),
       onShot: (count, weapon) => this.recordShots(count, weapon),
+      getPlayerDamageMul: () => (this.debugFlags.oneShot ? 20 : 1),
+      getEnemyOneHp: () => this.debugFlags.enemyOneHp,
+      getEnemyPassive: () => this.debugFlags.enemyPassive,
     });
 
     const stick = this.getElement('#touch-stick');
@@ -207,10 +213,76 @@ export class Game {
     const ultButton = this.getElement('#ult-button');
     this.input = new InputController(canvas, stick, knob, dashButton, ultButton, this.camera);
 
-    this.debugTools = new DebugTools(this.tuning, () => {
-      this.renderer.toneMappingExposure = this.tuning.exposure;
-      this.syncPostSize();
-    });
+    this.debugTools = new DebugTools(
+      this.tuning,
+      this.debugFlags,
+      {
+        fullHeal: () => {
+          this.player.hp = this.player.stats.maxHp;
+          this.player.shield = this.player.stats.maxShield;
+          this.player.alive = true;
+          this.player.group.visible = true;
+          if (this.mode === 'dead') this.mode = 'play';
+        },
+        clearHeat: () => {
+          this.player.heat = 0;
+          this.player.overheated = false;
+        },
+        fillUlt: () => {
+          this.player.ultCharge = 100;
+        },
+        grantAllUpgrades: () => {
+          for (const def of UPGRADE_POOL) {
+            const stacks = this.upgradeStacks[def.id] ?? 0;
+            const need = def.maxStacks - stacks;
+            for (let i = 0; i < need; i += 1) {
+              def.apply({
+                stats: this.player.stats,
+                build: this.combatBuild,
+                mods: this.combatMods,
+              });
+              this.upgradeStacks[def.id] = (this.upgradeStacks[def.id] ?? 0) + 1;
+            }
+          }
+          this.syncWeaponStats();
+          this.player.overheatEmp = this.combatMods.overheatEmp;
+          this.player.hp = this.player.stats.maxHp;
+          this.player.shield = this.player.stats.maxShield;
+          this.refreshPlayerForm();
+        },
+        killAllEnemies: () => {
+          for (const enemy of [...this.waves.enemies]) {
+            if (!enemy.alive) continue;
+            enemy.takeDamage(999999);
+            this.onEnemyKilled(enemy);
+          }
+        },
+        skipWave: () => {
+          for (const enemy of [...this.waves.enemies]) {
+            if (!enemy.alive) continue;
+            enemy.takeDamage(999999);
+            this.onEnemyKilled(enemy);
+          }
+          this.waves.debugClearWave();
+        },
+        openUpgrade: () => {
+          this.lastWaveShown = Math.max(0, this.waves.wave - 1);
+          this.mode = 'play';
+          this.openUpgrade();
+        },
+        restart: () => this.restart(),
+        setStress: (on) => this.setStressMode(on),
+        setLowGraphics: (on) => {
+          this.setLowGraphics(on);
+          const gfx = document.querySelector<HTMLInputElement>('#gfx-toggle');
+          if (gfx) gfx.checked = on;
+        },
+      },
+      () => {
+        this.renderer.toneMappingExposure = this.tuning.exposure;
+        this.syncPostSize();
+      },
+    );
 
     this.hud.setOverlayHandlers(
       () => this.handlePrimaryAction(),
@@ -219,6 +291,7 @@ export class Game {
     this.hud.setStressHandler((on) => this.setStressMode(on));
     this.hud.setGraphicsHandler((low) => this.setLowGraphics(low));
     this.hud.setUpgradePickHandler((index) => this.applyUpgrade(index));
+    this.hud.setLocaleToggleHandler(() => toggleLocale());
     this.hud.setWeaponPickHandler((index) => {
       if (this.mode === 'play') this.setWeapon(weaponAt(index));
     });
@@ -285,8 +358,13 @@ export class Game {
       return;
     }
     if (this.mode === 'upgrade') {
-      if (this.inputFrame.upgradeChoice >= 0) {
+      if (this.debugFlags.autoPickUpgrade && this.upgradeOffers.length > 0) {
+        this.applyUpgrade(0);
+        this.inputFrame.weaponChoice = -1;
+      } else if (this.inputFrame.upgradeChoice >= 0) {
         this.applyUpgrade(this.inputFrame.upgradeChoice);
+        // Digit 1/2/3 also queues a weapon swap; drop it so resume doesn't switch guns.
+        this.inputFrame.weaponChoice = -1;
       }
     } else if (this.mode === 'play' && this.inputFrame.weaponChoice >= 0) {
       this.setWeapon(weaponAt(this.inputFrame.weaponChoice));
@@ -344,6 +422,23 @@ export class Game {
     );
     const dashStarted = this.player.dashTimer > 0 && dashTimerBefore <= 0;
 
+    // —— Debug cheats that rewrite player state after update ——
+    if (this.debugFlags.godMode) {
+      this.player.alive = true;
+      this.player.group.visible = true;
+      this.player.hp = this.player.stats.maxHp;
+      this.player.shield = this.player.stats.maxShield;
+      this.player.invulnTimer = Math.max(this.player.invulnTimer, 0.35);
+      if (this.mode === 'dead') this.mode = 'play';
+    }
+    if (this.debugFlags.noOverheat) {
+      this.player.heat = 0;
+      this.player.overheated = false;
+      this.player.overheatPulse = false;
+    }
+    if (this.debugFlags.infiniteDash) this.player.dashCooldown = 0;
+    if (this.debugFlags.infiniteUlt) this.player.ultCharge = 100;
+
     if (dashHeld && this.player.dashCooldown > DEFAULT_PLAYER_STATS.dashCooldown - 0.05) {
       this.audio.dash();
       this.vfx.spawnBurst(this.player.group.position.clone().setY(0.4), '#22d3ee', 8, 4);
@@ -385,28 +480,25 @@ export class Game {
     }
 
     this.waves.update(delta, this.player.group.position, elapsed);
-    if (!this.stressMode && this.lastWaveShown >= 1 && this.waves.wave > this.lastWaveShown) {
-      this.openUpgrade();
-      this.enemyBatch.sync(this.waves.enemies);
-      return;
-    }
-    this.separateEnemies();
+    this.waves.freezeEnemies = this.debugFlags.freezeEnemies;
     this.enemyBatch.sync(this.waves.enemies);
     const state = this.waves.getState();
     if (state.wave !== this.lastWaveShown) {
       const prev = this.lastWaveShown;
+      // Commit the wave first — otherwise openUpgrade's early return left
+      // lastWaveShown stale and re-opened the picker every resume frame.
       this.lastWaveShown = state.wave;
       const boss = state.wave % 5 === 0;
-      this.hud.showWaveBanner(boss ? `BOSS · WAVE ${state.wave}` : `WAVE ${state.wave}`, boss);
+      this.hud.showWaveBanner(boss ? t().bossBanner(state.wave) : t().waveBanner(state.wave), boss);
       if (boss) this.audio.boss();
       else this.audio.wave();
       // Form tier steps only after boss milestones (waves 6 / 11 / 16).
       const formTier = enemyFormTierForWave(state.wave);
       if (formTier > this.lastEnemyFormTier) {
         this.lastEnemyFormTier = formTier;
-        this.hud.pushKillFeed(`HOSTILES EVOLVED · T${formTier}`, 'boss');
+        this.hud.pushKillFeed(t().hostilesEvolved(formTier), 'boss');
         window.setTimeout(() => {
-          this.hud.showWaveBanner(`HOSTILES EVOLVED · T${formTier}`, true);
+          this.hud.showWaveBanner(t().hostilesEvolved(formTier), true);
         }, 900);
       }
       // Wave clear beat: slow-mo + ground pulse when advancing past first wave
@@ -416,7 +508,12 @@ export class Game {
         this.worldFx.triggerPulse(this.player.group.position, '#22d3ee', 8);
         this.vfx.spawnShockwave(this.player.group.position, '#7ae7ff', 5);
       }
+      if (!this.stressMode && prev >= 1) {
+        this.openUpgrade();
+        return;
+      }
     }
+    this.separateEnemies();
 
     for (const enemy of this.waves.enemies) {
       if (!enemy.alive) continue;
@@ -425,7 +522,7 @@ export class Game {
       const dz = enemy.group.position.z - this.player.group.position.z;
       const rr = enemy.radius + PLAYER_RADIUS;
       const distSq = dx * dx + dz * dz;
-      if (distSq < rr * rr) {
+      if (distSq < rr * rr && !this.debugFlags.enemyPassive) {
         const hurt = this.player.takeDamage(enemy.stats.contactDamage);
         if (hurt.hit) {
           this.lastDeathCause = enemy.stats.kind;
@@ -465,7 +562,7 @@ export class Game {
         cover.resolveEntity(enemy.group.position, enemy.radius);
       }
 
-      if (enemy.wantShoot && enemy.stats.fireInterval > 0) {
+      if (enemy.wantShoot && enemy.stats.fireInterval > 0 && !this.debugFlags.enemyPassive) {
         const origin = enemy.group.position.clone().setY(0.55);
         const dir = new THREE.Vector3(
           this.player.group.position.x - origin.x,
@@ -653,14 +750,14 @@ export class Game {
     if (kind === 'boss') this.feel.triggerSlowmo(0.55, 0.35);
 
     if (kind === 'boss' || kind === 'elite' || kind === 'ranged') {
-      const label = kind === 'boss' ? 'SIEGE CORE DOWN' : kind === 'elite' ? 'ELITE SHATTERED' : 'SNIPER PICKED';
+      const label = kind === 'boss' ? t().killBoss : kind === 'elite' ? t().killElite : t().killRanged;
       this.hud.pushKillFeed(label, kind);
     } else if (this.kills % 5 === 0) {
-      this.hud.pushKillFeed(`×${this.kills} HOSTILES`, 'chaser');
+      this.hud.pushKillFeed(t().killCount(this.kills), 'chaser');
     }
 
     if (this.player.ultCharge >= 100 && this.player.ultCharge - this.player.stats.ultChargePerKill < 100) {
-      this.hud.pushKillFeed('ULT READY', 'boss');
+      this.hud.pushKillFeed(t().ultReady, 'boss');
     }
 
     if (kind === 'boss' || kind === 'elite') {
@@ -714,9 +811,10 @@ export class Game {
     this.combatBuild.weapon = id;
     this.syncWeaponStats();
     const def = WEAPON_DEFS[id];
+    const label = weaponName(id);
     this.hud.setActiveWeapon(id);
-    this.hud.flashPickup(def.name.toUpperCase(), def.color);
-    this.hud.pushKillFeed(`WEAPON · ${def.short}`, 'ranged');
+    this.hud.flashPickup(label, def.color);
+    this.hud.pushKillFeed(t().weaponPick(def.short), 'ranged');
     this.vfx.spawnBurst(this.player.muzzle, def.color, 6, 4);
     this.audio.pickupChain(1);
     this.publishDiagnostics();
@@ -736,8 +834,9 @@ export class Game {
     const result = advanceBossPhase(this.bossRuntime, ratio);
     enemy.bossPhaseColor = result.phase.color;
     if (!result.changed) return;
-    this.hud.showWaveBanner(`TITAN-07 · ${result.phase.name}`, true);
-    this.hud.pushKillFeed(`BOSS PHASE ${result.phase.id} · ${result.phase.name}`, 'boss');
+    const phaseName = bossPhaseName(result.phase.id);
+    this.hud.showWaveBanner(t().titanName(phaseName), true);
+    this.hud.pushKillFeed(t().bossPhase(result.phase.id, phaseName), 'boss');
     this.feel.triggerHitstop(0.12);
     this.feel.triggerFovPunch(5);
     this.worldFx.triggerPulse(enemy.group.position, result.phase.color, 8);
@@ -767,7 +866,7 @@ export class Game {
       for (let i = 0; i < phase.summonCount; i += 1) {
         this.waves.forceSpawnNear(boss.group.position, 'chaser');
       }
-      this.hud.pushKillFeed('TITAN REINFORCEMENTS', 'boss');
+      this.hud.pushKillFeed(t().titanReinforcements, 'boss');
     }
 
     if (phase.ringEvery > 0) {
@@ -846,10 +945,10 @@ export class Game {
       ult: '#a78bfa',
     };
     const labels: Record<string, string> = {
-      shield: 'SHIELD +20',
-      coolant: 'COOLANT FLUSH',
-      heal: 'REPAIR +25',
-      ult: 'ULT +25',
+      shield: t().pickupShield,
+      coolant: t().pickupCoolant,
+      heal: t().pickupHeal,
+      ult: t().pickupUlt,
     };
     const c = colors[pickup.kind] ?? '#4ade80';
     this.vfx.pickupPop(pickup.group.position, c);
@@ -857,7 +956,7 @@ export class Game {
     // Collect beam pulse
     this.worldFx.triggerPulse(pickup.group.position, c, 4);
     const chainTag = this.pickupChain > 1 ? ` ×${this.pickupChain}` : '';
-    this.hud.flashPickup(`${labels[pickup.kind] ?? 'PICKUP'}${chainTag}`, c);
+    this.hud.flashPickup(`${labels[pickup.kind] ?? t().pickupGeneric}${chainTag}`, c);
     if (pickup.kind === 'shield') this.player.addShield(20);
     else if (pickup.kind === 'coolant') this.player.coolHeat(45);
     else if (pickup.kind === 'heal') this.player.heal(25);
@@ -906,12 +1005,11 @@ export class Game {
           name: offer.name,
           desc: offer.desc,
           color: offer.color,
-          stackLabel: `Stack ${stack} → ${stack + 1}`,
+          stackLabel: t().stackLabel(stack, stack + 1),
         };
       }),
       this.waves.wave,
     );
-    this.audio.wave();
   }
 
   private applyUpgrade(index: number): void {
@@ -920,14 +1018,21 @@ export class Game {
     if (!offer) return;
     const def = getUpgrade(offer.id);
     if (!def) return;
+    if ((this.upgradeStacks[offer.id] ?? 0) >= def.maxStacks) {
+      this.upgradeOffers = [];
+      this.hud.hideUpgradeCards();
+      this.mode = 'play';
+      return;
+    }
     def.apply({ stats: this.player.stats, build: this.combatBuild, mods: this.combatMods });
     this.upgradeStacks[offer.id] = (this.upgradeStacks[offer.id] ?? 0) + 1;
     if (offer.id === 'armor') this.player.heal(20);
     if (offer.id === 'shield_bank') this.player.addShield(15);
     this.syncWeaponStats();
     this.player.overheatEmp = this.combatMods.overheatEmp;
-    this.hud.flashPickup(offer.name.toUpperCase(), offer.color);
-    this.hud.pushKillFeed(`MOD · ${offer.name}`, 'ranged');
+    const label = upgradeText(offer.id);
+    this.hud.flashPickup(label.name, offer.color);
+    this.hud.pushKillFeed(t().modPick(label.name), 'ranged');
     this.audio.pickupChain(1);
     this.feel.triggerFovPunch(1.6);
     this.upgradeOffers = [];
@@ -1677,20 +1782,21 @@ export class Game {
   private pushHud(delta: number): void {
     const waveState = this.waves.getState();
     const boss = this.waves.boss;
+    const dict = t();
     const status =
       this.mode === 'dead'
-        ? 'Systems offline'
+        ? dict.statusDead
         : this.mode === 'upgrade'
-          ? 'Select a retrofit module'
+          ? dict.statusUpgrade
           : this.player.overheated
-            ? 'Cooling weapon'
+            ? dict.statusCooling
             : boss
-              ? 'Destroy the Siege Core'
+              ? dict.statusBoss
               : this.stressMode
-                ? 'STRESS: hold the line'
+                ? dict.statusStress
                 : waveState.intermission > 0
-                  ? 'Next wave inbound'
-                  : 'Hold the arena';
+                  ? dict.statusInbound
+                  : dict.statusHold;
 
     this.hud.update(
       {
@@ -1712,7 +1818,7 @@ export class Game {
           visible: Boolean(boss),
           hpRatio: boss ? boss.hp / boss.maxHp : 0,
           name: boss
-            ? `TITAN-07 · ${getBossPhase(this.bossRuntime.phase).name}`
+            ? dict.titanName(bossPhaseName(this.bossRuntime.phase))
             : 'TITAN-07',
         },
         waveBanner: null,

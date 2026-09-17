@@ -24,6 +24,7 @@ import {
 } from './CombatModifiers';
 import type { WeaponId } from './Weapons';
 import { resolveWeaponStats, type CombatBuild } from './CombatBuild';
+import { t } from '../i18n';
 
 export type CombatDeps = {
   player: Player;
@@ -43,6 +44,12 @@ export type CombatDeps = {
   onPlayerProjectileHit: () => void;
   onDamageDealt?: (amount: number, weapon: string | null) => void;
   onShot?: (count: number, weapon: string) => void;
+  /** Debug: player damage multiplier. */
+  getPlayerDamageMul?: () => number;
+  /** Debug: enemies die in one hit. */
+  getEnemyOneHp?: () => boolean;
+  /** Debug: enemy projectiles deal no player damage. */
+  getEnemyPassive?: () => boolean;
 };
 
 /** Weapon fire, projectile hits, and rule-modifier combat side effects. */
@@ -133,6 +140,9 @@ export class CombatSystem {
             p.hitSet.add(enemy.group.uuid);
             enemy.hitFlash();
             let dmg = p.damage;
+            const playerMul = this.deps.getPlayerDamageMul?.() ?? 1;
+            if (playerMul !== 1) dmg *= playerMul;
+            if (this.deps.getEnemyOneHp?.()) dmg = Math.max(dmg, 999999);
             if (
               combatMods.scatterCloseBonus &&
               p.sourceWeapon === 'scatter' &&
@@ -156,7 +166,7 @@ export class CombatSystem {
             break;
           }
         }
-      } else {
+      } else if (!this.deps.getEnemyPassive?.()) {
         const dx = pos.x - player.group.position.x;
         const dz = pos.z - player.group.position.z;
         const rr = 0.55 + p.radius;
@@ -168,6 +178,12 @@ export class CombatSystem {
           }
           p.deactivate();
         }
+      } else {
+        // Passive: still despawn enemy bullets so the pool doesn't fill.
+        const dx = pos.x - player.group.position.x;
+        const dz = pos.z - player.group.position.z;
+        const rr = 0.55 + p.radius;
+        if (dx * dx + dz * dz <= rr * rr) p.deactivate();
       }
     }
   }
@@ -175,8 +191,8 @@ export class CombatSystem {
   castOverheatEmp(): void {
     const { player, waves, vfx, audio, hud, feel, worldFx, onEnemyKilled } = this.deps;
     audio.overheat();
-    hud.pushKillFeed('OVERHEAT · EMP', 'boss');
-    hud.showWaveBanner('EMP CASCADE', true);
+    hud.pushKillFeed(t().overheatEmp, 'boss');
+    hud.showWaveBanner(t().empCascade, true);
     vfx.spawnShockwave(player.group.position, '#f97316', OVERHEAT_EMP_RADIUS * 0.7);
     worldFx.triggerPulse(player.group.position, '#f97316', OVERHEAT_EMP_RADIUS);
     feel.triggerHitstop(0.1);
@@ -230,7 +246,7 @@ export class CombatSystem {
   maybeShieldNova(): void {
     if (!this.deps.combatMods.shieldNova) return;
     const { player, waves, vfx, hud, onEnemyKilled } = this.deps;
-    hud.pushKillFeed('SHIELD NOVA', 'ranged');
+    hud.pushKillFeed(t().shieldNova, 'ranged');
     vfx.spawnShockwave(player.group.position, '#3ec6ff', SHIELD_NOVA_RADIUS * 0.75);
     const origin = player.group.position;
     for (const enemy of waves.enemies) {

@@ -31,6 +31,8 @@ export type UpgradeCardView = {
   stackLabel: string;
 };
 
+import { applyStaticLocale, onLocaleChange, t } from '../i18n';
+
 export class Hud {
   private readonly els = {
     hpText: this.el('#hp-text'),
@@ -74,6 +76,7 @@ export class Hud {
     upgradeCards: this.el('#upgrade-cards'),
     upgradeTitle: this.el('#upgrade-title'),
     weaponBar: this.el('#weapon-bar'),
+    langButton: this.el<HTMLButtonElement>('#lang-toggle'),
   };
 
   private waveBannerTimer = 0;
@@ -84,12 +87,14 @@ export class Hud {
   private onGraphics: (low: boolean) => void = () => undefined;
   private onUpgradePick: (index: number) => void = () => undefined;
   private onWeaponPick: (index: number) => void = () => undefined;
+  private onLocaleToggle: () => void = () => undefined;
 
   constructor() {
     this.els.overlayPrimary.addEventListener('click', () => this.onPrimary());
     this.els.overlaySecondary.addEventListener('click', () => this.onSecondary());
     this.els.stressToggle.addEventListener('change', () => this.onStress(this.els.stressToggle.checked));
     this.els.gfxToggle.addEventListener('change', () => this.onGraphics(this.els.gfxToggle.checked));
+    this.els.langButton.addEventListener('click', () => this.onLocaleToggle());
 
     const chips = this.els.weaponBar.querySelectorAll<HTMLButtonElement>('.weapon-chip');
     chips.forEach((chip, index) => {
@@ -102,10 +107,19 @@ export class Hud {
       this.els.comboPips.appendChild(pip);
     }
     this.els.ultRing.style.strokeDasharray = String(this.ultCircumference);
+    applyStaticLocale();
+    onLocaleChange(() => {
+      applyStaticLocale();
+      this.refreshUpgradeChrome();
+    });
   }
 
   setWeaponPickHandler(handler: (index: number) => void): void {
     this.onWeaponPick = handler;
+  }
+
+  setLocaleToggleHandler(handler: () => void): void {
+    this.onLocaleToggle = handler;
   }
 
   setActiveWeapon(weapon: string): void {
@@ -132,8 +146,16 @@ export class Hud {
     this.onUpgradePick = handler;
   }
 
+  private refreshUpgradeChrome(): void {
+    const kicker = this.els.upgradePanel.querySelector<HTMLElement>('.upgrade-kicker');
+    if (kicker) kicker.textContent = t().upgradeKicker;
+    const sub = this.els.upgradePanel.querySelector<HTMLElement>('#upgrade-sub');
+    if (sub) sub.textContent = t().upgradeSub;
+  }
+
   showUpgradeCards(cards: UpgradeCardView[], wave: number): void {
-    this.els.upgradeTitle.textContent = `WAVE ${wave} · SELECT RETROFIT`;
+    this.els.upgradeTitle.textContent = t().upgradeTitle(wave);
+    this.refreshUpgradeChrome();
     this.els.upgradeCards.innerHTML = '';
     cards.forEach((card, index) => {
       const btn = document.createElement('button');
@@ -242,6 +264,7 @@ export class Hud {
 
   update(snapshot: HudSnapshot, delta: number): void {
     const { els } = this;
+    const dict = t();
     els.hpText.textContent = String(Math.ceil(snapshot.hp));
     els.hpFill.style.transform = `scaleX(${Math.max(0, snapshot.hp / snapshot.maxHp)})`;
     els.shieldText.textContent = String(Math.ceil(snapshot.shield));
@@ -299,23 +322,23 @@ export class Hud {
       this.hideUpgradeCards();
       els.overlay.classList.remove('hidden');
       if (snapshot.mode === 'paused') {
-        els.overlayTitle.textContent = snapshot.stress ? 'PAUSED · STRESS' : 'PAUSED';
-        els.overlaySub.textContent = 'Neon Siege Arena';
-        els.overlayPrimary.textContent = 'Resume';
-        els.overlaySecondary.textContent = 'Restart';
+        els.overlayTitle.textContent = snapshot.stress ? dict.pausedStress : dict.paused;
+        els.overlaySub.textContent = dict.gameTitle;
+        els.overlayPrimary.textContent = dict.resume;
+        els.overlaySecondary.textContent = dict.restart;
       } else {
-        els.overlayTitle.textContent = 'HULL BREACHED';
-        els.overlaySub.textContent = `Terminated by ${snapshot.deathCause}`;
-        els.overlayPrimary.textContent = 'Retry';
-        els.overlaySecondary.textContent = 'Stress Mode';
+        els.overlayTitle.textContent = dict.hullBreached;
+        els.overlaySub.textContent = dict.terminatedBy(snapshot.deathCause);
+        els.overlayPrimary.textContent = dict.retry;
+        els.overlaySecondary.textContent = dict.stressMode;
       }
       els.overlayStats.innerHTML = `
-        <div>Wave<strong>${snapshot.wave}</strong></div>
-        <div>Score<strong>${snapshot.score}</strong></div>
-        <div>Kills<strong>${snapshot.kills}</strong></div>
-        <div>Time<strong>${minutes}:${seconds}</strong></div>
-        <div>Peak Combo<strong>×${snapshot.peakCombo.toFixed(1)}</strong></div>
-        <div>Threat<strong>${snapshot.deathCause}</strong></div>
+        <div>${dict.statWave}<strong>${snapshot.wave}</strong></div>
+        <div>${dict.statScore}<strong>${snapshot.score}</strong></div>
+        <div>${dict.statKills}<strong>${snapshot.kills}</strong></div>
+        <div>${dict.statTime}<strong>${minutes}:${seconds}</strong></div>
+        <div>${dict.statPeakCombo}<strong>×${snapshot.peakCombo.toFixed(1)}</strong></div>
+        <div>${dict.statThreat}<strong>${snapshot.deathCause}</strong></div>
       `;
     }
   }
