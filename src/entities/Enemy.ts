@@ -98,6 +98,9 @@ export class Enemy {
   hitFlashTimer = 0;
   /** Brief AI freeze after contact knockback so the shove reads as a real stagger. */
   staggerTimer = 0;
+  /** Boss phase multipliers — owned by Game/BossPhases, applied in update. */
+  moveSpeedMul = 1;
+  fireIntervalMul = 1;
   /** Visual/stat form unlocked by wave progression. */
   readonly formTier: EnemyFormTier;
   /** Titan phase emissive tint; null keeps template color. */
@@ -218,7 +221,7 @@ export class Enemy {
     if (dist > 0.001) toPlayer.divideScalar(dist);
 
     let moveDir = toPlayer.clone();
-    let speed = this.stats.speed;
+    let speed = this.stats.speed * this.moveSpeedMul;
 
     if (this.stats.kind === 'ranged') {
       const preferred = 6.5;
@@ -271,9 +274,10 @@ export class Enemy {
     }
 
     if (this.stats.fireInterval > 0) {
+      const interval = Math.max(0.08, this.stats.fireInterval * this.fireIntervalMul);
       this.fireTimer -= delta;
       if (this.fireTimer <= 0) {
-        this.fireTimer = this.stats.fireInterval;
+        this.fireTimer = interval;
         this.wantShoot = true;
       }
     }

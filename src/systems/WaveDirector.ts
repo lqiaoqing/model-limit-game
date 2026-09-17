@@ -1,7 +1,13 @@
 import * as THREE from 'three';
-import { Enemy, ENEMY_TEMPLATES, type EnemyKind, type EnemyFormTier, type EnemyStats } from '../entities/Enemy';
+import {
+  Enemy,
+  ENEMY_TEMPLATES,
+  type EnemyKind,
+  type EnemyFormTier,
+  type EnemyStats,
+} from '../entities/Enemy';
 import { enemyFormTierForWave } from './EnemyAssets';
-import { composeWaveQueue, type SquadRecipeId } from './EncounterDirector';
+import { composeWaveTickets, type SpawnTicket, type SquadRecipeId } from './EncounterDirector';
 
 export type WaveState = {
   wave: number;
@@ -14,8 +20,9 @@ export type WaveState = {
 };
 
 export class WaveDirector {
-  private spawnQueue: EnemyKind[] = [];
+  private spawnQueue: SpawnTicket[] = [];
   private spawnTimer = 0;
+  private waveClock = 0;
   private intermission = 0;
   private spawnedThisWave = 0;
   private totalThisWave = 0;
@@ -40,6 +47,7 @@ export class WaveDirector {
     this.wave = 1;
     this.spawnQueue = [];
     this.spawnTimer = 0;
+    this.waveClock = 0;
     this.intermission = this.stressMode ? 0.15 : 1.2;
     this.spawnedThisWave = 0;
     this.totalThisWave = 0;
@@ -76,7 +84,6 @@ export class WaveDirector {
   }
 
   update(delta: number, playerPos: THREE.Vector3, elapsed: number): void {
-    // Cull dead
     for (let i = this.enemies.length - 1; i >= 0; i -= 1) {
       if (!this.enemies[i].alive) {
         const dead = this.enemies[i];
@@ -91,16 +98,27 @@ export class WaveDirector {
       if (this.intermission <= 0) {
         this.beginWave();
       }
-      // Fall through so a just-started wave can spawn this frame.
       if (this.intermission > 0) return;
     }
 
+    this.waveClock += delta;
     if (this.spawnQueue.length > 0) {
       this.spawnTimer -= delta;
       if (this.spawnTimer <= 0) {
-        this.spawnTimer = this.stressMode ? 0.08 : 0.35 + this.rng() * 0.25;
-        const kind = this.spawnQueue.shift();
-        if (kind) this.spawnEnemy(kind, playerPos);
+        let idx = -1;
+        for (let i = 0; i < this.spawnQueue.length; i += 1) {
+          if (this.spawnQueue[i].delay <= this.waveClock) {
+            idx = i;
+            break;
+          }
+        }
+        if (idx >= 0) {
+          const ticket = this.spawnQueue.splice(idx, 1)[0];
+          this.spawnTimer = this.stressMode ? 0.08 : 0.16 + this.rng() * 0.1;
+          this.spawnFromTicket(ticket, playerPos);
+        } else {
+          this.spawnTimer = 0.05;
+        }
       }
     }
 
@@ -119,16 +137,13 @@ export class WaveDirector {
   forceStartWave(playerPos?: THREE.Vector3): void {
     this.intermission = 0;
     this.beginWave();
-    // Ensure burst uses player-centered ring when provided
     if (playerPos && this.stressMode) {
-      // beginWave already burst-spawned at origin; extra ring pack around player
       for (let i = 0; i < 48; i += 1) {
-        this.spawnEnemy('chaser', playerPos);
+        this.spawnEnemyAt('chaser', playerPos.x, playerPos.z, true);
       }
     }
   }
 
-  /** Spawn a unit near a world point (boss reinforcements). */
   forceSpawnNear(position: THREE.Vector3, kind: EnemyKind): void {
     const hw = this.bounds.halfWidth - 1.2;
     const hd = this.bounds.halfDepth - 1.2;
@@ -139,7 +154,37 @@ export class WaveDirector {
     this.spawnEnemyAt(kind, x, z);
   }
 
-  private spawnEnemyAt(kind: EnemyKind, x: number, z: number): void {
+  private spawnFromTicket(ticket: SpawnTicket, playerPos: THREE.Vector3): void {
+    const hw = this.bounds.halfWidth - 1.2;
+    const hd = this.bounds.halfDepth - 1.2;
+    let x = ticket.offsetX;
+    let z = ticket.offsetZ;
+
+    if (ticket.squadId === 'stress' || ticket.anchor === 'center') {
+      const angle = this.rng() * Math.PI * 2;
+      const radius = 5.5 + this.rng() * 4.5;
+      x = THREE.MathUtils.clamp(playerPos.x + Math.cos(angle) * radius, -hw, hw);
+      z = THREE.MathUtils.clamp(playerPos.z + Math.sin(angle) * radius, -hd, hd);
+    } else {
+      const dx = x - playerPos.x;
+      const dz = z - playerPos.z;
+      if (dx * dx + dz * dz < 16) {
+        x = THREE.MathUtils.clamp(x + Math.sign(dx || 1) * 6, -hw, hw);
+        z = THREE.MathUtils.clamp(z + Math.sign(dz || 1) * 6, -hd, hd);
+      }
+    }
+    this.spawnEnemyAt(ticket.kind, x, z);
+  }
+
+  private spawnEnemyAt(kind: EnemyKind, x: number, z: number, ringAroundPoint = false): void {
+    if (ringAroundPoint) {
+      const hw = this.bounds.halfWidth - 1.2;
+      const hd = this.bounds.halfDepth - 1.2;
+      const angle = this.rng() * Math.PI * 2;
+      const radius = 5.5 + this.rng() * 4.5;
+      x = THREE.MathUtils.clamp(x + Math.cos(angle) * radius, -hw, hw);
+      z = THREE.MathUtils.clamp(z + Math.sin(angle) * radius, -hd, hd);
+    }
     const template = ENEMY_TEMPLATES[kind];
     const formTier: EnemyFormTier = enemyFormTierForWave(this.wave);
     const formMul = 1 + formTier * 0.18;
@@ -156,98 +201,38 @@ export class WaveDirector {
       scale: template.scale * (1 + formTier * 0.08),
     };
     const enemy = new Enemy(stats, new THREE.Vector3(x, 0, z), this.rng(), formTier);
-    enemy.telegraphTimer = this.stressMode ? 0.2 : 0.4;
+    enemy.telegraphTimer = this.stressMode ? 0.2 : 0.55;
     this.enemies.push(enemy);
     this.scene.add(enemy.group);
+    this.spawnedThisWave += 1;
     if (kind === 'boss') this.bossRef = enemy;
   }
 
   private beginWave(): void {
     const wave = this.wave;
     const isBossWave = wave % 5 === 0;
-    const { queue, squads } = composeWaveQueue({
+    const { tickets, squads } = composeWaveTickets({
       wave,
       stressMode: this.stressMode,
       rng: this.rng,
       bossWave: isBossWave,
+      halfWidth: this.bounds.halfWidth,
+      halfDepth: this.bounds.halfDepth,
     });
 
-    this.spawnQueue = queue;
+    this.spawnQueue = tickets;
     this.lastSquads = squads;
-    this.totalThisWave = queue.length;
+    this.totalThisWave = tickets.length;
     this.spawnedThisWave = 0;
     this.spawnTimer = 0;
+    this.waveClock = 0;
 
-    // Stress: flood a visible pack this frame so the mode is immediately dense.
     if (this.stressMode) {
       const burst = Math.min(80, this.spawnQueue.length);
       for (let i = 0; i < burst; i += 1) {
-        const kind = this.spawnQueue.shift();
-        if (kind) this.spawnEnemy(kind, new THREE.Vector3(0, 0, 0));
+        const ticket = this.spawnQueue.shift();
+        if (ticket) this.spawnEnemyAt(ticket.kind, 0, 0, true);
       }
     }
-  }
-
-  private spawnEnemy(kind: EnemyKind, playerPos: THREE.Vector3): void {
-    const template = ENEMY_TEMPLATES[kind];
-    const edge = Math.floor(this.rng() * 4);
-    const hw = this.bounds.halfWidth - 1.2;
-    const hd = this.bounds.halfDepth - 1.2;
-    let x = 0;
-    let z = 0;
-
-    if (this.stressMode) {
-      // Ring around player so the flood is immediately on-camera.
-      const angle = this.rng() * Math.PI * 2;
-      const radius = 5.5 + this.rng() * 4.5;
-      x = THREE.MathUtils.clamp(playerPos.x + Math.cos(angle) * radius, -hw, hw);
-      z = THREE.MathUtils.clamp(playerPos.z + Math.sin(angle) * radius, -hd, hd);
-    } else if (edge === 0) {
-      x = -hw;
-      z = (this.rng() * 2 - 1) * hd;
-    } else if (edge === 1) {
-      x = hw;
-      z = (this.rng() * 2 - 1) * hd;
-    } else if (edge === 2) {
-      x = (this.rng() * 2 - 1) * hw;
-      z = -hd;
-    } else {
-      x = (this.rng() * 2 - 1) * hw;
-      z = hd;
-    }
-    // Keep away from player spawn
-    const dx = x - playerPos.x;
-    const dz = z - playerPos.z;
-    if (dx * dx + dz * dz < 16) {
-      x = THREE.MathUtils.clamp(x + Math.sign(dx || 1) * 6, -hw, hw);
-      z = THREE.MathUtils.clamp(z + Math.sign(dz || 1) * 6, -hd, hd);
-    }
-
-    /**
-     * Difficulty comes only from discrete form tiers after boss milestones.
-     * No per-wave HP creep — that stacked with form multipliers and outran
-     * the player's retrofit curve.
-     */
-    const formTier: EnemyFormTier = enemyFormTierForWave(this.wave);
-    const formMul = 1 + formTier * 0.18;
-    const dmgMul = 1 + formTier * 0.1;
-    const speedMul = 1 + formTier * 0.04;
-    const radiusMul = 1 + formTier * 0.05;
-    const stats: EnemyStats = {
-      ...template,
-      hp: Math.round(template.hp * formMul),
-      speed: template.speed * speedMul,
-      radius: template.radius * radiusMul,
-      contactDamage: Math.round(template.contactDamage * dmgMul),
-      projectileDamage: Math.round(template.projectileDamage * dmgMul),
-      scale: template.scale * (1 + formTier * 0.08),
-    };
-    const enemy = new Enemy(stats, new THREE.Vector3(x, 0, z), this.rng(), formTier);
-    // Spawn anticipation: longer telegraph on non-stress so squad entries read.
-    enemy.telegraphTimer = this.stressMode ? 0.2 : 0.55;
-    this.enemies.push(enemy);
-    this.scene.add(enemy.group);
-    this.spawnedThisWave += 1;
-    if (kind === 'boss') this.bossRef = enemy;
   }
 }

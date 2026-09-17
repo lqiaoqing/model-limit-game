@@ -1,9 +1,9 @@
 ---
 feature: v30-model-arena
-status: delivered
+status: prototype
 updated: 2026-09-12
 branch: feat/v2-combat-depth
-commits: 760089d..90fa516
+commits: 760089d..HEAD
 ---
 
 # V3.0 Model Arena

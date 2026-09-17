@@ -3,16 +3,17 @@ export type BossPhaseId = 1 | 2 | 3;
 export type BossPhaseDef = {
   id: BossPhaseId;
   name: string;
-  /** Enter when hp/maxHp <= this threshold (exclusive upper bound of band). */
+  /** Enter when hp/maxHp <= this threshold. */
   maxHpRatio: number;
   moveSpeedMul: number;
   fireIntervalMul: number;
   projectileDamageMul: number;
-  /** Number of projectiles in the primary fan. */
   fanCount: number;
   fanSpread: number;
   summonEvery: number;
   summonCount: number;
+  /** Seconds between radial ring bursts (0 = none). */
+  ringEvery: number;
   color: string;
 };
 
@@ -28,6 +29,7 @@ export const BOSS_PHASES: BossPhaseDef[] = [
     fanSpread: 0.28,
     summonEvery: 6,
     summonCount: 2,
+    ringEvery: 0,
     color: '#f43f5e',
   },
   {
@@ -41,6 +43,7 @@ export const BOSS_PHASES: BossPhaseDef[] = [
     fanSpread: 0.2,
     summonEvery: 5,
     summonCount: 3,
+    ringEvery: 3.1,
     color: '#fb7185',
   },
   {
@@ -54,6 +57,7 @@ export const BOSS_PHASES: BossPhaseDef[] = [
     fanSpread: 0.16,
     summonEvery: 4,
     summonCount: 3,
+    ringEvery: 2.2,
     color: '#fda4af',
   },
 ];

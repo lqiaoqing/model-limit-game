@@ -9,6 +9,17 @@ declare global {
       setReducedMotion: (enabled: boolean) => void;
       hideDebugUi: (hidden: boolean) => void;
       pickUpgrade: (index: number) => { mode: string };
+      grantUpgrade?: (id: string) => { ok: boolean; weapon?: string };
+      getBuildSnapshot?: () => {
+        weapon: string;
+        fireInterval: number;
+        damage: number;
+        projectileSpeed: number;
+        pierce: number;
+        spread: number;
+        modifiers: string[];
+        stacks: Record<string, number>;
+      };
     };
     __THREE_GAME_DIAGNOSTICS__?: {
       frame: number;
@@ -34,6 +45,13 @@ declare global {
       particles?: number;
       backend?: string;
       webgpuSupported?: boolean;
+      combatTime?: number;
+      damageDealt?: number;
+      shotsFired?: number;
+      hitsLanded?: number;
+      dps?: number;
+      killsPerSec?: number;
+      frameMs?: { p50: number; p95: number; p99: number };
       player: {
         hp?: number;
         shield?: number;

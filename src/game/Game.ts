@@ -29,6 +29,7 @@ import { enemyFormTierForWave } from '../systems/EnemyAssets';
 import { createSeededRandom } from '../utils/random';
 import { WEAPON_DEFS, weaponAt, type WeaponId } from '../combat/Weapons';
 import { createCombatModifiers, modifierIds, resetCombatModifiers, type CombatModifiers } from '../combat/CombatModifiers';
+import { createCombatBuild, resetCombatBuild, resolveWeaponStats } from '../combat/CombatBuild';
 import { CombatSystem } from '../combat/CombatSystem';
 import {
   advanceBossPhase,
@@ -133,9 +134,8 @@ export class Game {
   private fpsAccum = 0;
   private fpsFrames = 0;
   private weapon: WeaponId = 'plasma';
-  /** Upgrade deltas relative to the *active* weapon def — never vs plasma defaults. */
-  private weaponBonuses = { fireMul: 1, speedMul: 1, dmgBonus: 0 };
   private readonly combatMods: CombatModifiers = createCombatModifiers();
+  private readonly combatBuild = createCombatBuild(this.combatMods);
   private combat!: CombatSystem;
   private bossRuntime: BossRuntime = createBossRuntime();
   private lastBossRef: Enemy | null = null;
@@ -143,6 +143,13 @@ export class Game {
   private stressMode = false;
   private lowGraphics = false;
   private kills = 0;
+  private combatTime = 0;
+  private damageDealt = 0;
+  private shotsFired = 0;
+  private hitsLanded = 0;
+  private readonly damageByWeapon: Record<string, number> = {};
+  private readonly shotsByWeapon: Record<string, number> = {};
+  private readonly frameTimes: number[] = [];
   private lastDeathCause = 'unknown';
   private pickupChain = 0;
   private pickupChainTimer = 0;
@@ -182,6 +189,7 @@ export class Game {
       worldFx: this.worldFx,
       decals: this.decals,
       combatMods: this.combatMods,
+      getBuild: () => this.combatBuild,
       getWeapon: () => this.weapon,
       rng: () => this.rng(),
       onEnemyKilled: (enemy, source) => this.onEnemyKilled(enemy, source),
@@ -189,6 +197,8 @@ export class Game {
         this.lastDeathCause = 'projectile';
         this.onPlayerHurt();
       },
+      onDamageDealt: (amount, weapon) => this.recordDamage(amount, weapon),
+      onShot: (count, weapon) => this.recordShots(count, weapon),
     });
 
     const stick = this.getElement('#touch-stick');
@@ -250,6 +260,8 @@ export class Game {
 
   private update(delta: number, elapsed: number): void {
     this.frame += 1;
+    this.frameTimes.push(delta);
+    if (this.frameTimes.length > 240) this.frameTimes.shift();
     this.fpsAccum += delta;
     this.fpsFrames += 1;
     if (this.fpsAccum >= 0.4) {
@@ -314,6 +326,7 @@ export class Game {
   }
 
   private simulate(delta: number, elapsed: number): void {
+    this.combatTime += delta;
     this.input.computeAim(this.player.group.position, this.tmp.aim);
 
     this.player.overheatEmp = this.combatMods.overheatEmp;
@@ -674,10 +687,31 @@ export class Game {
     }
   }
 
+  private recordShots(count: number, weapon: string): void {
+    this.shotsFired += count;
+    this.shotsByWeapon[weapon] = (this.shotsByWeapon[weapon] ?? 0) + count;
+  }
+
+  private recordDamage(amount: number, weapon: string | null): void {
+    this.damageDealt += amount;
+    this.hitsLanded += 1;
+    if (weapon) this.damageByWeapon[weapon] = (this.damageByWeapon[weapon] ?? 0) + amount;
+  }
+
+  private frameMsSnapshot(): { p50: number; p95: number; p99: number } {
+    if (this.frameTimes.length === 0) return { p50: 16.7, p95: 16.7, p99: 16.7 };
+    const sorted = this.frameTimes.map((d) => d * 1000).sort((a, b) => a - b);
+    const pick = (p: number) => {
+      const idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
+      return Number(sorted[idx].toFixed(2));
+    };
+    return { p50: pick(50), p95: pick(95), p99: pick(99) };
+  }
+
   private setWeapon(id: WeaponId): void {
     if (this.weapon === id) return;
-    this.captureWeaponBonuses();
     this.weapon = id;
+    this.combatBuild.weapon = id;
     this.syncWeaponStats();
     const def = WEAPON_DEFS[id];
     this.hud.setActiveWeapon(id);
@@ -688,21 +722,13 @@ export class Game {
     this.publishDiagnostics();
   }
 
-  /** Read retrofit deltas off current player stats relative to the active weapon. */
-  private captureWeaponBonuses(): void {
-    const w = WEAPON_DEFS[this.weapon];
-    this.weaponBonuses.fireMul = this.player.stats.fireInterval / w.fireInterval;
-    this.weaponBonuses.speedMul = this.player.stats.projectileSpeed / w.projectileSpeed;
-    this.weaponBonuses.dmgBonus = this.player.stats.projectileDamage - w.damage;
-  }
-
-  /** Write the active weapon profile + stored retrofit deltas onto player stats. */
+  /** Apply resolved weapon identity onto PlayerStats numeric layer. */
   private syncWeaponStats(): void {
-    const w = WEAPON_DEFS[this.weapon];
-    this.player.stats.fireInterval = Math.max(0.05, w.fireInterval * this.weaponBonuses.fireMul);
-    this.player.stats.heatPerShot = w.heatPerShot;
-    this.player.stats.projectileSpeed = w.projectileSpeed * this.weaponBonuses.speedMul;
-    this.player.stats.projectileDamage = Math.max(1, w.damage + this.weaponBonuses.dmgBonus);
+    const resolved = resolveWeaponStats(this.combatBuild, this.weapon);
+    this.player.stats.fireInterval = resolved.fireInterval;
+    this.player.stats.heatPerShot = resolved.heatPerShot;
+    this.player.stats.projectileSpeed = resolved.projectileSpeed;
+    this.player.stats.projectileDamage = resolved.damage;
   }
 
   private updateBossPhase(enemy: Enemy): void {
@@ -731,9 +757,11 @@ export class Game {
     this.updateBossPhase(boss);
     const phase = getBossPhase(this.bossRuntime.phase);
     boss.bossPhaseColor = phase.color;
-    // Soft speed bias without mutating shared template stats permanently.
-    // Phase 2/3 add radial rings + summons on top of the existing fan shot.
-    this.bossRuntime.summonTimer -= delta * phase.moveSpeedMul;
+    // Phase params drive real combat model — not just VFX density.
+    boss.moveSpeedMul = phase.moveSpeedMul;
+    boss.fireIntervalMul = phase.fireIntervalMul;
+
+    this.bossRuntime.summonTimer -= delta;
     if (this.bossRuntime.summonTimer <= 0 && phase.summonCount > 0) {
       this.bossRuntime.summonTimer = phase.summonEvery;
       for (let i = 0; i < phase.summonCount; i += 1) {
@@ -741,10 +769,11 @@ export class Game {
       }
       this.hud.pushKillFeed('TITAN REINFORCEMENTS', 'boss');
     }
-    if (phase.id >= 2) {
+
+    if (phase.ringEvery > 0) {
       this.bossRuntime.ringTimer -= delta;
       if (this.bossRuntime.ringTimer <= 0) {
-        this.bossRuntime.ringTimer = phase.id === 3 ? 2.2 : 3.1;
+        this.bossRuntime.ringTimer = phase.ringEvery;
         const origin = boss.group.position.clone().setY(0.55);
         const spokes = phase.id === 3 ? 12 : 8;
         for (let i = 0; i < spokes; i += 1) {
@@ -891,11 +920,10 @@ export class Game {
     if (!offer) return;
     const def = getUpgrade(offer.id);
     if (!def) return;
-    def.apply(this.player.stats, this.combatMods);
+    def.apply({ stats: this.player.stats, build: this.combatBuild, mods: this.combatMods });
     this.upgradeStacks[offer.id] = (this.upgradeStacks[offer.id] ?? 0) + 1;
     if (offer.id === 'armor') this.player.heal(20);
     if (offer.id === 'shield_bank') this.player.addShield(15);
-    this.captureWeaponBonuses();
     this.syncWeaponStats();
     this.player.overheatEmp = this.combatMods.overheatEmp;
     this.hud.flashPickup(offer.name.toUpperCase(), offer.color);
@@ -938,6 +966,13 @@ export class Game {
     this.peakCombo = 1;
     this.comboTimer = 0;
     this.kills = 0;
+    this.combatTime = 0;
+    this.damageDealt = 0;
+    this.shotsFired = 0;
+    this.hitsLanded = 0;
+    for (const k of Object.keys(this.damageByWeapon)) delete this.damageByWeapon[k];
+    for (const k of Object.keys(this.shotsByWeapon)) delete this.shotsByWeapon[k];
+    this.frameTimes.length = 0;
     this.lastDeathCause = 'unknown';
     this.pickupChain = 0;
     this.pickupChainTimer = 0;
@@ -948,8 +983,8 @@ export class Game {
     this.upgradeStacks = {};
     this.upgradeOffers = [];
     this.weapon = 'plasma';
-    this.weaponBonuses = { fireMul: 1, speedMul: 1, dmgBonus: 0 };
     resetCombatModifiers(this.combatMods);
+    resetCombatBuild(this.combatBuild, this.combatMods);
     this.bossRuntime = createBossRuntime();
     this.lastBossRef = null;
     this.combat.reset();
@@ -1748,6 +1783,29 @@ export class Game {
         this.applyUpgrade(index);
         return { mode: this.mode };
       },
+      grantUpgrade: (id: string) => {
+        const def = getUpgrade(id as UpgradeId);
+        if (!def) return { ok: false };
+        def.apply({ stats: this.player.stats, build: this.combatBuild, mods: this.combatMods });
+        this.upgradeStacks[id as UpgradeId] = (this.upgradeStacks[id as UpgradeId] ?? 0) + 1;
+        this.syncWeaponStats();
+        this.player.overheatEmp = this.combatMods.overheatEmp;
+        this.publishDiagnostics();
+        return { ok: true, weapon: this.weapon };
+      },
+      getBuildSnapshot: () => {
+        const resolved = resolveWeaponStats(this.combatBuild, this.weapon);
+        return {
+          weapon: this.weapon,
+          fireInterval: resolved.fireInterval,
+          damage: resolved.damage,
+          projectileSpeed: resolved.projectileSpeed,
+          pierce: resolved.pierce,
+          spread: resolved.spread,
+          modifiers: modifierIds(this.combatMods),
+          stacks: { ...this.upgradeStacks },
+        };
+      },
     };
   }
 
@@ -1776,6 +1834,14 @@ export class Game {
       particles: this.vfx.activeCount(),
       backend: this.backend.kind,
       webgpuSupported: this.backend.webgpuSupported,
+      combatTime: this.combatTime,
+      damageDealt: this.damageDealt,
+      shotsFired: this.shotsFired,
+      hitsLanded: this.hitsLanded,
+      dps: this.combatTime > 0.05 ? Number((this.damageDealt / this.combatTime).toFixed(2)) : 0,
+      killsPerSec:
+        this.combatTime > 0.05 ? Number((this.kills / this.combatTime).toFixed(2)) : 0,
+      frameMs: this.frameMsSnapshot(),
       player: {
         hp: this.player.hp,
         shield: this.player.shield,

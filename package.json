@@ -11,6 +11,8 @@
     "verify:visual": "playwright test tests/visual.spec.ts",
     "inspect:canvas": "node scripts/inspect-threejs-canvas.mjs",
     "balance": "node scripts/balance-harness.mjs",
+    "balance:smoke": "node scripts/balance-harness.mjs --seeds 42,137 --duration 8",
+    "balance:full": "node scripts/balance-harness.mjs",
     "arena:eval": "node scripts/arena-eval.mjs",
     "arena:compare": "node scripts/arena-compare.mjs"
   },

@@ -22,7 +22,8 @@ import {
   SHIELD_NOVA_DAMAGE,
   SHIELD_NOVA_RADIUS,
 } from './CombatModifiers';
-import { WEAPON_DEFS, type WeaponId } from './Weapons';
+import type { WeaponId } from './Weapons';
+import { resolveWeaponStats, type CombatBuild } from './CombatBuild';
 
 export type CombatDeps = {
   player: Player;
@@ -35,10 +36,13 @@ export type CombatDeps = {
   worldFx: WorldFx;
   decals: GroundDecals;
   combatMods: CombatModifiers;
+  getBuild: () => CombatBuild;
   getWeapon: () => WeaponId;
   rng: () => number;
   onEnemyKilled: (enemy: Enemy, source?: { sourceWeapon: string | null; damage: number }) => void;
   onPlayerProjectileHit: () => void;
+  onDamageDealt?: (amount: number, weapon: string | null) => void;
+  onShot?: (count: number, weapon: string) => void;
 };
 
 /** Weapon fire, projectile hits, and rule-modifier combat side effects. */
@@ -62,28 +66,27 @@ export class CombatSystem {
   }
 
   firePlayerWeapon(): void {
-    const { player, projectiles, vfx, audio, feel, combatMods, getWeapon } = this.deps;
-    const w = WEAPON_DEFS[getWeapon()];
+    const { player, projectiles, vfx, audio, feel, getBuild, getWeapon } = this.deps;
+    const build = getBuild();
+    const resolved = resolveWeaponStats(build, getWeapon());
     audio.shoot();
     this.tmpDir.set(player.aim.x, 0, player.aim.y);
-    const pierce = w.id === 'rail' ? w.pierce + combatMods.railPierce : w.pierce;
-    const spread =
-      w.id === 'scatter' && combatMods.scatterCloseBonus ? w.spread * 0.72 : w.spread;
-    for (let i = 0; i < w.pellets; i += 1) {
-      const t = w.pellets === 1 ? 0 : i / (w.pellets - 1) - 0.5;
-      const angle = t * spread * 2;
+    for (let i = 0; i < resolved.pellets; i += 1) {
+      const t = resolved.pellets === 1 ? 0 : i / (resolved.pellets - 1) - 0.5;
+      const angle = t * resolved.spread * 2;
       const dir = this.tmpDir.clone().applyAxisAngle(this.tmpUp, angle);
       projectiles.spawn(
         player.muzzle,
         dir,
-        player.stats.projectileSpeed,
-        player.stats.projectileDamage,
+        resolved.projectileSpeed,
+        resolved.damage,
         'player',
-        w.color,
-        { pierce, sourceWeapon: w.id },
+        resolved.color,
+        { pierce: resolved.pierce, sourceWeapon: resolved.def.id },
       );
     }
-    vfx.spawnBurst(player.muzzle, w.color, w.pellets > 1 ? 5 : 3, 3.5);
+    this.deps.onShot?.(resolved.pellets, resolved.def.id);
+    vfx.spawnBurst(player.muzzle, resolved.color, resolved.pellets > 1 ? 5 : 3, 3.5);
     vfx.spawnBurst(
       player.muzzle
         .clone()
@@ -92,7 +95,7 @@ export class CombatSystem {
       1,
       2.2,
     );
-    feel.triggerFovPunch(w.id === 'rail' ? 2.2 : 1.1);
+    feel.triggerFovPunch(resolved.def.id === 'rail' ? 2.2 : 1.1);
   }
 
   resolveProjectileHits(arena: { halfWidth: number; halfDepth: number }, covers: { blocksPoint(p: THREE.Vector3): boolean; takeDamage(n: number): void }[]): void {
@@ -142,6 +145,7 @@ export class CombatSystem {
             }
             p.hitsLanded += 1;
             const died = enemy.takeDamage(dmg);
+            this.deps.onDamageDealt?.(dmg, p.sourceWeapon);
             audio.hit();
             vfx.spawnBurst(pos, p.crit ? '#fbbf24' : enemy.stats.color, p.crit ? 10 : 6, 5);
             if (!died) decals.spawnImpact(pos, enemy.stats.color);

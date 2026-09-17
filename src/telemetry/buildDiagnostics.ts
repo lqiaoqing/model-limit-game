@@ -22,6 +22,13 @@ export type DiagnosticsInput = {
   particles: number;
   backend: RenderBackendKind;
   webgpuSupported: boolean;
+  combatTime: number;
+  damageDealt: number;
+  shotsFired: number;
+  hitsLanded: number;
+  dps: number;
+  killsPerSec: number;
+  frameMs: { p50: number; p95: number; p99: number };
   player: {
     hp: number;
     shield: number;

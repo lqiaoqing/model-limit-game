@@ -1,4 +1,5 @@
 import type { PlayerStats } from '../entities/Player';
+import type { CombatBuild } from '../combat/CombatBuild';
 import type { CombatModifiers } from '../combat/CombatModifiers';
 import type { WeaponId } from '../combat/Weapons';
 
@@ -20,26 +21,31 @@ export type UpgradeId =
   | 'dash_detonation'
   | 'shield_nova';
 
+export type UpgradeApplyCtx = {
+  stats: PlayerStats;
+  build: CombatBuild;
+  mods: CombatModifiers;
+};
+
 export type UpgradeDef = {
   id: UpgradeId;
   name: string;
   desc: string;
   color: string;
   maxStacks: number;
-  /** Soft bias when this weapon is active (1 = neutral). */
   weaponAffinity?: WeaponId;
-  apply: (stats: PlayerStats, mods: CombatModifiers) => void;
+  apply: (ctx: UpgradeApplyCtx) => void;
 };
 
 export const UPGRADE_POOL: UpgradeDef[] = [
   {
     id: 'overclock',
     name: 'Overclock',
-    desc: 'Fire rate +10%',
+    desc: 'Fire rate +10% (all weapons)',
     color: '#22d3ee',
     maxStacks: 4,
-    apply: (s) => {
-      s.fireInterval = Math.max(0.062, s.fireInterval * 0.9);
+    apply: ({ build }) => {
+      build.global.fireMul *= 0.9;
     },
   },
   {
@@ -48,8 +54,8 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     desc: 'Move speed +0.45',
     color: '#7ae7ff',
     maxStacks: 4,
-    apply: (s) => {
-      s.moveSpeed += 0.45;
+    apply: ({ stats }) => {
+      stats.moveSpeed += 0.45;
     },
   },
   {
@@ -58,8 +64,8 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     desc: 'Max hull +20 · repair 20',
     color: '#ff4d6d',
     maxStacks: 5,
-    apply: (s) => {
-      s.maxHp += 20;
+    apply: ({ stats }) => {
+      stats.maxHp += 20;
     },
   },
   {
@@ -68,8 +74,8 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     desc: 'Max shield +15 · charge 15',
     color: '#3ec6ff',
     maxStacks: 4,
-    apply: (s) => {
-      s.maxShield += 15;
+    apply: ({ stats }) => {
+      stats.maxShield += 15;
     },
   },
   {
@@ -78,9 +84,9 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     desc: 'Heat cooling +7/s',
     color: '#4ade80',
     maxStacks: 4,
-    apply: (s) => {
-      s.heatCoolPerSec += 7;
-      s.overheatLockPerSec += 3;
+    apply: ({ stats }) => {
+      stats.heatCoolPerSec += 7;
+      stats.overheatLockPerSec += 3;
     },
   },
   {
@@ -89,8 +95,8 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     desc: 'Max heat +12',
     color: '#a78bfa',
     maxStacks: 3,
-    apply: (s) => {
-      s.maxHeat += 12;
+    apply: ({ stats }) => {
+      stats.maxHeat += 12;
     },
   },
   {
@@ -99,18 +105,18 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     desc: 'Dash cooldown −12%',
     color: '#22d3ee',
     maxStacks: 4,
-    apply: (s) => {
-      s.dashCooldown = Math.max(0.45, s.dashCooldown * 0.88);
+    apply: ({ stats }) => {
+      stats.dashCooldown = Math.max(0.45, stats.dashCooldown * 0.88);
     },
   },
   {
     id: 'mag_accel',
     name: 'Mag Accelerator',
-    desc: 'Projectile speed +4',
+    desc: 'Projectile speed +8% (all weapons)',
     color: '#94a3b8',
     maxStacks: 4,
-    apply: (s) => {
-      s.projectileSpeed += 4;
+    apply: ({ build }) => {
+      build.global.speedMul *= 1.08;
     },
   },
   {
@@ -120,7 +126,7 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     color: '#38bdf8',
     maxStacks: 2,
     weaponAffinity: 'plasma',
-    apply: (_s, mods) => {
+    apply: ({ mods }) => {
       mods.arcChain += 1;
     },
   },
@@ -131,7 +137,7 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     color: '#f97316',
     maxStacks: 1,
     weaponAffinity: 'plasma',
-    apply: (_s, mods) => {
+    apply: ({ mods }) => {
       mods.overheatEmp = true;
     },
   },
@@ -142,20 +148,20 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     color: '#e879f9',
     maxStacks: 1,
     weaponAffinity: 'plasma',
-    apply: (_s, mods) => {
+    apply: ({ mods }) => {
       mods.critConductor = true;
     },
   },
   {
     id: 'rail_bore',
     name: 'Rail Bore',
-    desc: 'Rail pierce +1 · pierce damage +',
+    desc: 'Rail pierce +1 · rail damage +2 only',
     color: '#fbbf24',
     maxStacks: 2,
     weaponAffinity: 'rail',
-    apply: (s, mods) => {
-      mods.railPierce += 1;
-      s.projectileDamage += 2;
+    apply: ({ build }) => {
+      build.modifiers.railPierce += 1;
+      build.perWeapon.rail.dmgBonus += 2;
     },
   },
   {
@@ -165,20 +171,21 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     color: '#f59e0b',
     maxStacks: 1,
     weaponAffinity: 'rail',
-    apply: (_s, mods) => {
+    apply: ({ mods }) => {
       mods.railHeatRefund = true;
     },
   },
   {
     id: 'scatter_choke',
     name: 'Scatter Choke',
-    desc: 'Close-range bonus damage',
+    desc: 'Scatter tighter + close bonus only',
     color: '#f472b6',
     maxStacks: 2,
     weaponAffinity: 'scatter',
-    apply: (s, mods) => {
-      mods.scatterCloseBonus = true;
-      s.projectileDamage += 1;
+    apply: ({ build }) => {
+      build.modifiers.scatterCloseBonus = true;
+      build.perWeapon.scatter.dmgBonus += 1;
+      build.perWeapon.scatter.spreadMul *= 0.72;
     },
   },
   {
@@ -188,7 +195,7 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     color: '#22d3ee',
     maxStacks: 1,
     weaponAffinity: 'scatter',
-    apply: (_s, mods) => {
+    apply: ({ mods }) => {
       mods.dashDetonation = true;
     },
   },
@@ -198,7 +205,7 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     desc: 'Shield break emits a nova',
     color: '#3ec6ff',
     maxStacks: 1,
-    apply: (_s, mods) => {
+    apply: ({ mods }) => {
       mods.shieldNova = true;
     },
   },
@@ -211,7 +218,6 @@ export type UpgradeOffer = {
   color: string;
 };
 
-/** Pick 3 distinct offers weighted toward under-stacked upgrades + weapon affinity. */
 export function rollUpgradeOffers(
   stacks: Partial<Record<UpgradeId, number>>,
   rng: () => number,

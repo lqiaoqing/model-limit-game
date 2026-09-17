@@ -1,30 +1,28 @@
 ---
 feature: v2-combat-depth
-status: delivered
+status: alpha
 updated: 2026-09-12
 branch: feat/v2-combat-depth
-commits: c2a25531141e941f544f71f906852836305dcd6f..418b642
+commits: c2a25531141e941f544f71f906852836305dcd6f..HEAD
 ---
 
 # V2 Combat Depth Vertical Slice
 
 ## Report
 
-**What was built** — Neon Siege Arena V2 combat-depth slice: three switchable weapons (Plasma Repeater / Railgun / Scattergun) with distinct fire profiles; a hybrid retrofit pool of ~16 modules including 8 rule-changers (Arc Capacitor, Overheat Cascade EMP, Critical Conductor, Rail Bore/Reactor, Scatter Choke, Dash Detonation, Shield Nova) with weapon-affinity weighting; EncounterDirector threat-budget squads layered on WaveDirector for non-Stress waves with longer spawn telegraphs; and TITAN-07 as a three-phase boss (Sweep / Lockdown / Overdrive) with fan densification, radial rings, and summoned adds. Weapon identity uses `weaponBonuses` deltas relative to the active weapon def so switching never corrupts stats. Pierce uses a per-projectile hit set; Rail Bore scales with already-landed hits. Diagnostics expose `weapon`, `modifiers`, `bossPhase`, and live weapon numeric stats.
+**What was built** — Neon Siege Arena V2 combat-depth **vertical slice (alpha)**: three switchable weapons; hybrid retrofit pool with rule modifiers; EncounterDirector **SpawnTicket formations** (hunter pack / artillery nest / shield wall / assassin pincer / suppression); TITAN-07 phases with real `moveSpeedMul` / `fireIntervalMul` on Enemy. Explicit `CombatBuild` (`global` + `perWeapon` + `modifiers`) + pure `resolveWeaponStats` so Rail Bore / Scatter Choke cannot leak into other weapons. Formal regression `tests/v2-combat.spec.ts` covers round-trip identity, pollution, encounter presence, DPS/frameMs diagnostics.
+
+**Not delivered yet** — 4th weapon, 30 upgrades, 8 archetypes, 3 bosses, hazards, 15–20 min full run.
 
 **Verification** —
 - `npx tsc --noEmit` PASS
-- `npm run build` PASS
-- `npx playwright test --project=desktop-chrome` PASS (bot-playtest + visual)
-- mobile-safari: PRE-EXISTING missing WebKit browser on this machine
-- `scripts/smoke-v2.mjs` PASS — plasma↔rail↔scatter round-trip preserves plasma 0.11/12/28/4.2
+- `npx playwright test --project=desktop-chrome` PASS (bot + v2-combat ×5 + visual)
 
 **Journey log** —
-1. First `syncWeaponStats` used `DEFAULT_PLAYER_STATS` as baseline; plasma↔rail round-trip permanently applied the rail profile. Fixed with `captureWeaponBonuses` + active-weapon deltas.
-2. Pierce nudge of `radius*1.4` still re-hit near-center bodies; replaced with projectile `hitSet` (no nudge).
-3. `rail_bore` initially scaled with remaining pierce (first hit strongest). Corrected to `hitsLanded`.
-4. Boss phase runtime persisted across bosses (wave 10+ spurious banner). Reset when `waves.boss` identity changes.
-5. `Player.takeDamage` return type became `{hit, shieldBroke}` for Shield Nova; both player call sites updated.
+1. `captureWeaponBonuses` reverse-engineering leaked weapon-affinity damage across guns; replaced by explicit CombatBuild.
+2. Director previously flattened squads to random edge spawns; SpawnTickets carry anchor/formation/delay.
+3. Boss `moveSpeedMul` was only scaling summon timers; now multiplies Enemy speed and fire interval.
+4. Spec statuses demoted from delivered → alpha/prototype after review.
 
 ## [S1] Problem
 

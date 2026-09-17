@@ -98,6 +98,13 @@ async function sample(page) {
       alive: d.player?.alive !== false,
       fireInterval: d.player?.fireInterval ?? 0,
       projectileDamage: d.player?.projectileDamage ?? 0,
+      combatTime: d.combatTime ?? 0,
+      damageDealt: d.damageDealt ?? 0,
+      shotsFired: d.shotsFired ?? 0,
+      hitsLanded: d.hitsLanded ?? 0,
+      dps: d.dps ?? 0,
+      killsPerSec: d.killsPerSec ?? 0,
+      frameMs: d.frameMs ?? null,
     };
   });
 }
@@ -175,6 +182,10 @@ async function runSession(page, { seed, weaponKey, weaponId, durationSec, canvas
   const sortedFps = fpsSamples.slice().sort((a, b) => a - b);
   const killsDelta = Math.max(0, maxKills - before.kills);
   const scoreDelta = Math.max(0, maxScore - before.score);
+  const combatTime = Math.max(after?.combatTime ?? 0, 0.001);
+  const damageDealt = after?.damageDealt ?? 0;
+  const trueDps = Number((damageDealt / combatTime).toFixed(2));
+  const killsPerSec = Number((killsDelta / Math.max(wallSec, 0.001)).toFixed(2));
 
   return {
     seed,
@@ -182,7 +193,12 @@ async function runSession(page, { seed, weaponKey, weaponId, durationSec, canvas
     wallSec: Number(wallSec.toFixed(2)),
     kills: killsDelta,
     score: scoreDelta,
-    dps: Number((killsDelta / Math.max(wallSec, 0.001)).toFixed(2)),
+    dps: trueDps,
+    killsPerSec,
+    damageDealt,
+    combatTime: Number(combatTime.toFixed(2)),
+    shotsFired: after?.shotsFired ?? 0,
+    hitsLanded: after?.hitsLanded ?? 0,
     deaths,
     dashes,
     upgradePicks,
@@ -196,6 +212,7 @@ async function runSession(page, { seed, weaponKey, weaponId, durationSec, canvas
       fireInterval: after?.fireInterval ?? before.fireInterval,
       projectileDamage: after?.projectileDamage ?? before.projectileDamage,
     },
+    frameMs: after?.frameMs ?? null,
     perf: {
       fpsAvg: fpsSamples.length
         ? Number((fpsSamples.reduce((a, b) => a + b, 0) / fpsSamples.length).toFixed(1))
@@ -203,6 +220,9 @@ async function runSession(page, { seed, weaponKey, weaponId, durationSec, canvas
       fpsP50: Number(percentile(sortedFps, 50).toFixed(1)),
       fpsP95: Number(percentile(sortedFps, 95).toFixed(1)),
       fpsMin: sortedFps[0] ?? 0,
+      frameMsP50: after?.frameMs?.p50 ?? 0,
+      frameMsP95: after?.frameMs?.p95 ?? 0,
+      frameMsP99: after?.frameMs?.p99 ?? 0,
       projectilesEnd: after?.projectiles ?? 0,
       particlesEnd: after?.particles ?? 0,
       backend: after?.backend ?? 'webgl2',
@@ -227,11 +247,15 @@ function aggregate(runs) {
       killsAvg: avg('kills'),
       scoreAvg: avg('score'),
       dpsAvg: avg('dps'),
+      killsPerSecAvg: avg('killsPerSec'),
       deathsAvg: avg('deaths'),
       overheatedRatioAvg: avg('overheatedRatio'),
       fpsAvg: avgPerf('fpsAvg'),
       fpsP50Avg: avgPerf('fpsP50'),
       fpsP95Avg: avgPerf('fpsP95'),
+      frameMsP50Avg: avgPerf('frameMsP50'),
+      frameMsP95Avg: avgPerf('frameMsP95'),
+      frameMsP99Avg: avgPerf('frameMsP99'),
     };
   });
 
@@ -278,12 +302,12 @@ function renderScorecard({ meta, aggregate: agg, runs }) {
   lines.push('## Weapon balance');
   lines.push('');
   lines.push(
-    '| Weapon | Kills avg | Score avg | DPS avg | Deaths avg | Overheat | FPS p50 | FPS p95 | Note |',
+    '| Weapon | Kills avg | DPS avg | Kills/s | Deaths avg | Overheat | Frame p50/p99 | FPS p50 | Note |',
   );
   lines.push('|---|---:|---:|---:|---:|---:|---:|---:|---|');
   for (const row of agg.weaponRows) {
     lines.push(
-      `| ${row.weapon} | ${row.killsAvg} | ${row.scoreAvg} | ${row.dpsAvg} | ${row.deathsAvg} | ${row.overheatedRatioAvg} | ${row.fpsAvg} / ${row.fpsP50Avg} | ${row.fpsP95Avg} | ${row.balanceNote} |`,
+      `| ${row.weapon} | ${row.killsAvg} | ${row.dpsAvg} | ${row.killsPerSecAvg} | ${row.deathsAvg} | ${row.overheatedRatioAvg} | ${row.frameMsP50Avg} / ${row.frameMsP99Avg} | ${row.fpsP50Avg} | ${row.balanceNote} |`,
     );
   }
   lines.push('');
@@ -365,7 +389,7 @@ async function main() {
       });
       runs.push(run);
       process.stdout.write(
-        `kills=${run.kills} dps=${run.dps} deaths=${run.deaths} fpsP95=${run.perf.fpsP95}\n`,
+        `kills=${run.kills} dps=${run.dps} kps=${run.killsPerSec} deaths=${run.deaths} frameP99=${run.perf.frameMsP99}\n`,
       );
     }
   }

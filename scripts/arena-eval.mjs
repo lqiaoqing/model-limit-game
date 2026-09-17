@@ -175,7 +175,9 @@ async function scoreProbes(root, probeGroups, files) {
         for (const [rel, full] of fileMap) {
           // include patterns: **/*.{ext,...}, **/tests/**, exact suffix
           let includeHit = false;
-          if (include.includes('*.{')) {
+          if (include.includes('tests/')) {
+            includeHit = rel.includes('tests/') && /\.(ts|js|mjs)$/.test(rel);
+          } else if (include.includes('*.{')) {
             const m = include.match(/\*\{([^}]+)\}/);
             const exts = m ? m[1].split(',') : ['ts', 'js'];
             includeHit = exts.some((ext) => rel.endsWith(`.${ext}`));
@@ -299,27 +301,32 @@ async function main() {
   const tests = checks.bot.ran ? (checks.bot.pass ? Math.max(testsBase, 0.85) : testsBase * 0.4) : testsBase;
   const mobile = probeScores.mobile?.ratio ?? 0;
 
-  // Performance: probes + optional FPS from balance
+  // Performance: probes + optional FPS from balance. When checks were skipped, cap.
   let perf = probeScores.performance?.ratio ?? 0;
   if (checks.balance.summary?.weaponRows?.length) {
     const fps = checks.balance.summary.weaponRows.reduce((s, r) => s + (r.fpsP95Avg || 0), 0) /
       checks.balance.summary.weaponRows.length;
-    // 60 → 1.0, 30 → 0.5, soft scale
     const fpsScore = clamp01(fps / 60);
     perf = clamp01(perf * 0.45 + fpsScore * 0.55);
+  } else if (checks.balance.ran === false) {
+    perf = Math.min(perf, 0.7);
   }
 
-  // Bug rate: fewer failures → higher score
+  // Bug rate: skipped checks cannot earn full credit.
   let bugRate = 1;
   if (checks.build.ran && !checks.build.pass) bugRate -= 0.6;
   if (checks.bot.ran && !checks.bot.pass) bugRate -= 0.3;
   if (checks.balance.ran && !checks.balance.pass) bugRate -= 0.1;
+  if (!checks.build.ran) bugRate -= 0.25;
+  if (!checks.bot.ran) bugRate -= 0.15;
   bugRate = clamp01(bugRate);
 
-  // Completion: how many depth+architecture probes hit
+  // Completion requires functional evidence, not just file presence.
   const depthHits = (probeScores.depth?.details ?? []).filter((d) => d.hit).length;
   const depthTotal = (probeScores.depth?.details ?? []).length || 1;
-  const completion = clamp01(depthHits / depthTotal);
+  let completion = clamp01(depthHits / depthTotal);
+  if (!checks.bot.ran || !checks.bot.pass) completion = Math.min(completion, 0.55);
+  if (!checks.build.ran || !checks.build.pass) completion = Math.min(completion, 0.4);
 
   const weights = scoring.weights;
   const dimensions = {

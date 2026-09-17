@@ -1,9 +1,9 @@
 ---
 feature: v30-balance-telemetry
-status: delivered
+status: prototype
 updated: 2026-09-12
 branch: feat/v2-combat-depth
-commits: 08c95b7..2d4c362
+commits: 08c95b7..HEAD
 ---
 
 # V3.0 Multi-Seed Balance Telemetry + Auto Scorecard
