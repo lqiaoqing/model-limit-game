@@ -82,7 +82,7 @@ export class DebugTools {
     private readonly tuning: DebugTuning,
     private readonly flags: DebugFlags,
     private readonly actions: DebugActions,
-    onChange: () => void,
+    private readonly onChange: () => void,
   ) {
     this.trigger = this.ensureTrigger();
     this.trigger.addEventListener('click', () => this.toggle());
@@ -91,8 +91,6 @@ export class DebugTools {
 
     const params = new URLSearchParams(window.location.search);
     if (params.has('debug')) this.setOpen(true);
-
-    void onChange;
   }
 
   private ensureTrigger(): HTMLButtonElement {
@@ -157,12 +155,13 @@ export class DebugTools {
     actions.open();
 
     const modes = gui.addFolder('模式 Modes');
+    const modeState = { stress: false, low: false };
     modes
-      .add({ stress: false }, 'stress')
+      .add(modeState, 'stress')
       .name('极限压力 Stress')
       .onChange((on: boolean) => this.actions.setStress(on));
     modes
-      .add({ low: false }, 'low')
+      .add(modeState, 'low')
       .name('低画质 Low Graphics')
       .onChange((on: boolean) => this.actions.setLowGraphics(on));
 
@@ -171,8 +170,14 @@ export class DebugTools {
     tune.add(this.tuning, 'dashMultiplier', 1, 3, 0.05).name('冲刺倍率 Dash ×');
     tune.add(this.tuning, 'acceleration', 4, 22, 0.1).name('加速度 Accel');
     tune.add(this.tuning, 'cameraLag', 0.02, 0.8, 0.01).name('镜头延迟 Cam Lag');
-    tune.add(this.tuning, 'maxDpr', 1, 2, 0.25).name('DPR');
-    tune.add(this.tuning, 'exposure', 0.6, 1.8, 0.01).name('曝光 Exposure');
+    tune
+      .add(this.tuning, 'maxDpr', 1, 2, 0.25)
+      .name('DPR')
+      .onChange(() => this.onChange());
+    tune
+      .add(this.tuning, 'exposure', 0.6, 1.8, 0.01)
+      .name('曝光 Exposure')
+      .onChange(() => this.onChange());
 
     // Keep panel on screen
     gui.domElement.style.position = 'fixed';

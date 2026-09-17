@@ -69,6 +69,9 @@ export class Player {
   fireCooldown = 0;
   invulnTimer = 0;
   alive = true;
+  /** Debug/live tuning multipliers (not reset by stats rebuild). */
+  dashSpeedMul = 1;
+  moveAccel = 14;
   readonly muzzle = new THREE.Vector3();
 
   private recoil = 0;
@@ -565,7 +568,8 @@ export class Player {
       }
     }
 
-    const speed = this.dashTimer > 0 ? this.stats.dashSpeed : this.stats.moveSpeed;
+    const speed =
+      this.dashTimer > 0 ? this.stats.dashSpeed * this.dashSpeedMul : this.stats.moveSpeed;
     if (this.dashTimer > 0) this.dashTimer = Math.max(0, this.dashTimer - delta);
 
     const target = new THREE.Vector3(move.x, 0, move.y).multiplyScalar(speed);
@@ -575,7 +579,7 @@ export class Player {
       }
     }
 
-    const smoothing = 1 - Math.exp(-14 * delta);
+    const smoothing = 1 - Math.exp(-Math.max(1, this.moveAccel) * delta);
     this.velocity.lerp(target, smoothing);
     this.group.position.addScaledVector(this.velocity, delta);
     this.group.position.x = THREE.MathUtils.clamp(

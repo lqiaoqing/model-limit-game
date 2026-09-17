@@ -352,6 +352,12 @@ export class Game {
     const animDelta = this.reducedMotion ? 0 : delta;
     const animElapsed = this.reducedMotion ? 0 : elapsed;
 
+    // Live debug tuning — must run even when not simulating (paused/dead/upgrade).
+    this.player.stats.moveSpeed = this.tuning.speed;
+    this.player.dashSpeedMul = this.tuning.dashMultiplier;
+    this.player.moveAccel = this.tuning.acceleration;
+    if (this.debugFlags.godMode) this.reviveGodMode();
+
     this.input.read(this.inputFrame);
     if (this.inputFrame.restartPressed) {
       this.restart();
@@ -365,6 +371,11 @@ export class Game {
         this.applyUpgrade(this.inputFrame.upgradeChoice);
         // Digit 1/2/3 also queues a weapon swap; drop it so resume doesn't switch guns.
         this.inputFrame.weaponChoice = -1;
+      } else if (this.inputFrame.pausePressed) {
+        // Cancel picker instead of soft-locking (P/Esc was ignored in upgrade mode).
+        this.upgradeOffers = [];
+        this.hud.hideUpgradeCards();
+        this.mode = 'play';
       }
     } else if (this.mode === 'play' && this.inputFrame.weaponChoice >= 0) {
       this.setWeapon(weaponAt(this.inputFrame.weaponChoice));
@@ -423,14 +434,7 @@ export class Game {
     const dashStarted = this.player.dashTimer > 0 && dashTimerBefore <= 0;
 
     // —— Debug cheats that rewrite player state after update ——
-    if (this.debugFlags.godMode) {
-      this.player.alive = true;
-      this.player.group.visible = true;
-      this.player.hp = this.player.stats.maxHp;
-      this.player.shield = this.player.stats.maxShield;
-      this.player.invulnTimer = Math.max(this.player.invulnTimer, 0.35);
-      if (this.mode === 'dead') this.mode = 'play';
-    }
+    if (this.debugFlags.godMode) this.reviveGodMode();
     if (this.debugFlags.noOverheat) {
       this.player.heat = 0;
       this.player.overheated = false;
@@ -479,8 +483,8 @@ export class Game {
       cover.resolveEntity(this.player.group.position, 0.55);
     }
 
-    this.waves.update(delta, this.player.group.position, elapsed);
     this.waves.freezeEnemies = this.debugFlags.freezeEnemies;
+    this.waves.update(delta, this.player.group.position, elapsed);
     this.enemyBatch.sync(this.waves.enemies);
     const state = this.waves.getState();
     if (state.wave !== this.lastWaveShown) {
@@ -767,6 +771,17 @@ export class Game {
     }
   }
 
+  private reviveGodMode(): void {
+    this.player.alive = true;
+    this.player.group.visible = true;
+    this.player.hp = this.player.stats.maxHp;
+    this.player.shield = this.player.stats.maxShield;
+    this.player.invulnTimer = Math.max(this.player.invulnTimer, 0.4);
+    this.player.heat = 0;
+    this.player.overheated = false;
+    if (this.mode === 'dead') this.mode = 'play';
+  }
+
   private onPlayerHurt(): void {
     this.combo = 1;
     this.comboTimer = 0;
@@ -777,6 +792,10 @@ export class Game {
     this.vfx.addTrauma(0.45);
     this.vfx.spawnBurst(this.player.group.position.clone().setY(0.7), '#ff4d6d', 10, 6);
     if (!this.player.alive) {
+      if (this.debugFlags.godMode) {
+        this.reviveGodMode();
+        return;
+      }
       this.mode = 'dead';
       this.audio.death();
       this.vfx.spawnShockwave(this.player.group.position, '#ff4d6d', 10);
@@ -1100,6 +1119,8 @@ export class Game {
     this.feel.reset();
     this.player.reset();
     this.player.stats = { ...DEFAULT_PLAYER_STATS, moveSpeed: this.tuning.speed };
+    this.player.dashSpeedMul = this.tuning.dashMultiplier;
+    this.player.moveAccel = this.tuning.acceleration;
     this.player.overheatEmp = false;
     this.syncWeaponStats();
     this.player.setFormTier(0);
