@@ -3,7 +3,7 @@ feature: v25-perf-architecture
 status: delivered
 updated: 2026-09-12
 branch: feat/v2-combat-depth
-commits: 51119e7..HEAD
+commits: 51119e7..3d6e567
 ---
 
 # V2.5 Perf Ceiling + Architecture Split
