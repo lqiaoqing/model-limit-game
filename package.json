@@ -10,7 +10,9 @@
     "test": "playwright test",
     "verify:visual": "playwright test tests/visual.spec.ts",
     "inspect:canvas": "node scripts/inspect-threejs-canvas.mjs",
-    "balance": "node scripts/balance-harness.mjs"
+    "balance": "node scripts/balance-harness.mjs",
+    "arena:eval": "node scripts/arena-eval.mjs",
+    "arena:compare": "node scripts/arena-compare.mjs"
   },
   "dependencies": {
     "lil-gui": "^0.21.0",

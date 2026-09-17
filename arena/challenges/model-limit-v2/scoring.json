@@ -1,0 +1,50 @@
+{
+  "id": "model-limit-v2",
+  "title": "Model Limit Arena V2",
+  "weights": {
+    "gameplay": 0.2,
+    "depth": 0.15,
+    "visual": 0.15,
+    "performance": 0.15,
+    "architecture": 0.1,
+    "tests": 0.1,
+    "mobile": 0.05,
+    "bugRate": 0.05,
+    "completion": 0.05
+  },
+  "probes": {
+    "depth": [
+      { "id": "weapons_module", "glob": "**/Weapons.ts", "points": 1 },
+      { "id": "three_weapons", "pattern": "scatter|railgun|WEAPON_DEFS", "include": "**/*.{ts,tsx,js}", "points": 1 },
+      { "id": "rule_upgrades", "pattern": "overheat.*emp|arc.?chain|shield.?nova|dash.?deton|rail.?bore|rail.?reactor", "include": "**/*.{ts,js}", "points": 1 },
+      { "id": "encounter_director", "glob": "**/EncounterDirector.ts", "points": 1 },
+      { "id": "boss_phases", "glob": "**/BossPhases.ts", "points": 1 },
+      { "id": "pierce_projectile", "pattern": "pierce", "include": "**/Projectile.ts", "points": 0.5 }
+    ],
+    "architecture": [
+      { "id": "combat_system", "glob": "**/CombatSystem.ts", "points": 1 },
+      { "id": "telemetry", "glob": "**/buildDiagnostics.ts", "points": 0.75 },
+      { "id": "render_backend", "glob": "**/RenderBackend.ts", "points": 0.75 },
+      { "id": "game_not_monolith", "maxLines": 2200, "glob": "**/Game.ts", "points": 0.5 }
+    ],
+    "visual": [
+      { "id": "instanced_enemies", "pattern": "InstancedMesh", "include": "**/EnemyBatchRenderer.ts", "points": 1 },
+      { "id": "vfx_system", "glob": "**/VfxSystem.ts", "points": 0.5 },
+      { "id": "postfx_or_lighting", "pattern": "bloom|toneMapping|PostFx", "include": "**/*.{ts,js}", "points": 0.5 }
+    ],
+    "performance": [
+      { "id": "stress_mode", "pattern": "stress", "include": "**/*.{ts,js}", "points": 0.5 },
+      { "id": "high_capacity_pool", "pattern": "2500|520|4000|capacity", "include": "**/*.{ts,js}", "points": 0.5 },
+      { "id": "balance_harness", "glob": "**/balance-harness.mjs", "points": 1 }
+    ],
+    "tests": [
+      { "id": "playwright_config", "glob": "**/playwright.config.ts", "points": 0.5 },
+      { "id": "bot_or_e2e", "pattern": "bot|playtest|e2e", "include": "**/tests/**/*.{ts,js}", "points": 1 },
+      { "id": "package_test_script", "file": "package.json", "pattern": "\"test\"", "points": 0.5 }
+    ],
+    "mobile": [
+      { "id": "touch_controls", "pattern": "touch-stick|touch-controls|coarse", "include": "**/*.{ts,html,css}", "points": 1 },
+      { "id": "mobile_meta", "file": "index.html", "pattern": "viewport|safe-area", "points": 0.5 }
+    ]
+  }
+}
