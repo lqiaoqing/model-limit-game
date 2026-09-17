@@ -3,7 +3,7 @@ feature: v2-combat-depth
 status: delivered
 updated: 2026-09-12
 branch: feat/v2-combat-depth
-commits: c2a25531141e941f544f71f906852836305dcd6f..HEAD
+commits: c2a25531141e941f544f71f906852836305dcd6f..418b642
 ---
 
 # V2 Combat Depth Vertical Slice
