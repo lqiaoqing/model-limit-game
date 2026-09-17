@@ -31,6 +31,9 @@ declare global {
       enemyFormTier?: number;
       targetScore?: number;
       projectiles?: number;
+      particles?: number;
+      backend?: string;
+      webgpuSupported?: boolean;
       player: {
         hp?: number;
         shield?: number;

@@ -64,11 +64,12 @@ export function composeWaveQueue(options: {
 }): { queue: EnemyKind[]; squads: SquadRecipeId[] } {
   const { wave, stressMode, rng, bossWave } = options;
   if (stressMode) {
-    const countBase = 55 + Math.min(180, wave * 10);
+    // Perf ceiling: wave 8+ aims for ~450–500 live chasers (+burst dump).
+    const countBase = 80 + Math.min(280, wave * 18);
     const queue: EnemyKind[] = [];
     if (bossWave) queue.push('boss');
     for (let i = 0; i < countBase; i += 1) queue.push('chaser');
-    for (let i = 0; i < 120; i += 1) queue.push('chaser');
+    for (let i = 0; i < 200; i += 1) queue.push('chaser');
     return { queue, squads: [] };
   }
 

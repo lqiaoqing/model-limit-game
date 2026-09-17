@@ -1,20 +1,13 @@
 import * as THREE from 'three';
+import { createRenderBackend, resizeBackend, type RenderBackend } from './RenderBackend';
 
+/** Legacy WebGL-only helpers — prefer RenderBackend for dual-path setup. */
 export function createRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
-  const renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: true,
-    alpha: false,
-    powerPreference: 'high-performance',
-  });
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
-  // Composer multi-pass would otherwise reset info every pass.
-  renderer.info.autoReset = false;
-  return renderer;
+  const backend = createRenderBackend(canvas);
+  if (backend.kind !== 'webgl2') {
+    throw new Error('createRenderer expects the WebGL2 backend');
+  }
+  return backend.renderer as THREE.WebGLRenderer;
 }
 
 export function resizeRenderer(
@@ -22,20 +15,11 @@ export function resizeRenderer(
   camera: THREE.PerspectiveCamera,
   maxDpr = 2,
 ): boolean {
-  const canvas = renderer.domElement;
-  const width = Math.max(1, Math.floor(canvas.clientWidth));
-  const height = Math.max(1, Math.floor(canvas.clientHeight));
-  const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
-  const bufferWidth = Math.floor(width * dpr);
-  const bufferHeight = Math.floor(height * dpr);
-  const needsResize = canvas.width !== bufferWidth || canvas.height !== bufferHeight;
-
-  if (needsResize) {
-    renderer.setPixelRatio(dpr);
-    renderer.setSize(width, height, false);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-  }
-
-  return needsResize;
+  const backend: RenderBackend = {
+    kind: 'webgl2',
+    renderer,
+    webgpuSupported: false,
+    supportsWebGlPost: true,
+  };
+  return resizeBackend(backend, camera, maxDpr);
 }

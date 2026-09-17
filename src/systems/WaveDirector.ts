@@ -122,7 +122,7 @@ export class WaveDirector {
     // Ensure burst uses player-centered ring when provided
     if (playerPos && this.stressMode) {
       // beginWave already burst-spawned at origin; extra ring pack around player
-      for (let i = 0; i < 20; i += 1) {
+      for (let i = 0; i < 48; i += 1) {
         this.spawnEnemy('chaser', playerPos);
       }
     }
@@ -180,7 +180,7 @@ export class WaveDirector {
 
     // Stress: flood a visible pack this frame so the mode is immediately dense.
     if (this.stressMode) {
-      const burst = Math.min(40, this.spawnQueue.length);
+      const burst = Math.min(80, this.spawnQueue.length);
       for (let i = 0; i < burst; i += 1) {
         const kind = this.spawnQueue.shift();
         if (kind) this.spawnEnemy(kind, new THREE.Vector3(0, 0, 0));

@@ -23,11 +23,11 @@ export class EnemyBatchRenderer {
 
   constructor(
     private readonly scene: THREE.Scene,
-    // Stress mode can push ~240 chasers (55+180 base, ~50% chaser ratio, +120 dump).
-    // Anything past capacity is skipped by sync() and would fight invisibly.
-    capacity = 400,
+    // Stress ceiling targets ~500 live non-boss units. Capacity is per kind×tier
+    // bucket so a single flooded tier cannot silently drop instances.
+    capacity = 520,
   ) {
-    const perTier = Math.max(120, Math.ceil(capacity / 2));
+    const perTier = Math.max(160, capacity);
     for (const kind of BATCH_KINDS) {
       for (const tier of FORM_TIERS) {
         const assets = getEnemyAssets(kind, tier);

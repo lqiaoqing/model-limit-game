@@ -1,49 +1,93 @@
 import * as THREE from 'three';
 
-type Particle = {
-  mesh: THREE.Mesh;
-  velocity: THREE.Vector3;
+type BurstParticle = {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
   life: number;
   maxLife: number;
   scale: number;
+  r: number;
+  g: number;
+  b: number;
 };
 
+type Shockwave = {
+  mesh: THREE.Mesh;
+  geo: THREE.RingGeometry;
+  mat: THREE.MeshBasicMaterial;
+  start: number;
+  radius: number;
+};
+
+/**
+ * High-count particle pool rendered as one InstancedMesh.
+ * Shockwaves stay as short-lived ring meshes (low count, high readability).
+ */
 export class VfxSystem {
-  private readonly particles: Particle[] = [];
-  private readonly pool: Particle[] = [];
-  private readonly geometry = new THREE.SphereGeometry(0.08, 6, 6);
+  private readonly bursts: BurstParticle[] = [];
+  private readonly shocks: Shockwave[] = [];
+  private readonly dummy = new THREE.Object3D();
+  private readonly color = new THREE.Color();
   private trauma = 0;
+  private readonly mesh: THREE.InstancedMesh;
+  private readonly geometry = new THREE.SphereGeometry(0.08, 5, 4);
+  private readonly material = new THREE.MeshBasicMaterial({
+    color: '#ffffff',
+    transparent: true,
+    opacity: 0.95,
+    depthWrite: false,
+  });
 
   constructor(
     private readonly scene: THREE.Scene,
     private readonly rng: () => number = Math.random,
-  ) {}
+    capacity = 4000,
+  ) {
+    this.mesh = new THREE.InstancedMesh(this.geometry, this.material, capacity);
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.mesh.frustumCulled = false;
+    this.mesh.count = 0;
+    this.mesh.castShadow = false;
+    this.mesh.receiveShadow = false;
+    scene.add(this.mesh);
+  }
 
   spawnBurst(position: THREE.Vector3, color: string, count = 10, speed = 6): void {
-    for (let i = 0; i < count; i += 1) {
-      const p = this.acquire();
-      const mat = p.mesh.material as THREE.MeshBasicMaterial;
-      mat.color.set(color);
-      p.mesh.position.copy(position);
-      p.mesh.visible = true;
+    this.color.set(color);
+    const r = this.color.r;
+    const g = this.color.g;
+    const b = this.color.b;
+    const budget = Math.max(0, this.mesh.instanceMatrix.count - this.bursts.length);
+    const n = Math.min(count, budget);
+    for (let i = 0; i < n; i += 1) {
       const theta = this.rng() * Math.PI * 2;
       const phi = Math.acos(2 * this.rng() - 1);
       const s = speed * (0.4 + this.rng() * 0.8);
-      p.velocity.set(
-        Math.sin(phi) * Math.cos(theta) * s,
-        Math.abs(Math.cos(phi)) * s * 0.6,
-        Math.sin(phi) * Math.sin(theta) * s,
-      );
-      p.maxLife = 0.35 + this.rng() * 0.35;
-      p.life = p.maxLife;
-      p.scale = 0.7 + this.rng() * 0.8;
-      p.mesh.scale.setScalar(p.scale);
-      this.particles.push(p);
+      const life = 0.35 + this.rng() * 0.35;
+      this.bursts.push({
+        x: position.x,
+        y: position.y,
+        z: position.z,
+        vx: Math.sin(phi) * Math.cos(theta) * s,
+        vy: Math.abs(Math.cos(phi)) * s * 0.6,
+        vz: Math.sin(phi) * Math.sin(theta) * s,
+        life,
+        maxLife: life,
+        scale: 0.7 + this.rng() * 0.8,
+        r,
+        g,
+        b,
+      });
     }
   }
 
   spawnShockwave(position: THREE.Vector3, color: string, radius = 7): void {
-    const geo = new THREE.RingGeometry(0.2, 0.45, 48);
+    if (this.shocks.length > 24) return;
+    const geo = new THREE.RingGeometry(0.2, 0.45, 32);
     const mat = new THREE.MeshBasicMaterial({
       color,
       transparent: true,
@@ -55,20 +99,7 @@ export class VfxSystem {
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.set(position.x, 0.08, position.z);
     this.scene.add(mesh);
-    const start = performance.now();
-    const animate = () => {
-      const t = (performance.now() - start) / 450;
-      if (t >= 1) {
-        this.scene.remove(mesh);
-        geo.dispose();
-        mat.dispose();
-        return;
-      }
-      mesh.scale.setScalar(1 + t * radius);
-      mat.opacity = 0.85 * (1 - t);
-      requestAnimationFrame(animate);
-    };
-    animate();
+    this.shocks.push({ mesh, geo, mat, start: performance.now(), radius });
     this.addTrauma(0.35);
   }
 
@@ -129,60 +160,77 @@ export class VfxSystem {
     return out;
   }
 
+  activeCount(): number {
+    return this.bursts.length;
+  }
+
   update(delta: number): void {
-    for (let i = this.particles.length - 1; i >= 0; i -= 1) {
-      const p = this.particles[i];
+    for (let i = this.bursts.length - 1; i >= 0; i -= 1) {
+      const p = this.bursts[i];
       p.life -= delta;
-      p.velocity.y -= 12 * delta;
-      p.mesh.position.addScaledVector(p.velocity, delta);
-      if (p.mesh.position.y < 0.05) {
-        p.mesh.position.y = 0.05;
-        p.velocity.y *= -0.35;
-        p.velocity.x *= 0.7;
-        p.velocity.z *= 0.7;
+      p.vy -= 12 * delta;
+      p.x += p.vx * delta;
+      p.y += p.vy * delta;
+      p.z += p.vz * delta;
+      if (p.y < 0.05) {
+        p.y = 0.05;
+        p.vy *= -0.35;
+        p.vx *= 0.7;
+        p.vz *= 0.7;
       }
-      const t = Math.max(0, p.life / p.maxLife);
-      p.mesh.scale.setScalar(p.scale * t);
       if (p.life <= 0) {
-        p.mesh.visible = false;
-        this.particles.splice(i, 1);
-        this.pool.push(p);
+        const last = this.bursts.pop();
+        if (last && last !== p) this.bursts[i] = last;
       }
+    }
+
+    const max = this.mesh.instanceMatrix.count;
+    const n = Math.min(this.bursts.length, max);
+    for (let i = 0; i < n; i += 1) {
+      const p = this.bursts[i];
+      const t = Math.max(0, p.life / Math.max(p.maxLife, 0.0001));
+      this.dummy.position.set(p.x, p.y, p.z);
+      this.dummy.scale.setScalar(p.scale * t);
+      this.dummy.rotation.set(0, 0, 0);
+      this.dummy.updateMatrix();
+      this.mesh.setMatrixAt(i, this.dummy.matrix);
+      this.mesh.setColorAt(i, this.color.setRGB(p.r, p.g, p.b));
+    }
+    this.mesh.count = n;
+    this.mesh.instanceMatrix.needsUpdate = true;
+    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+
+    for (let i = this.shocks.length - 1; i >= 0; i -= 1) {
+      const s = this.shocks[i];
+      const t = (performance.now() - s.start) / 450;
+      if (t >= 1) {
+        this.scene.remove(s.mesh);
+        s.geo.dispose();
+        s.mat.dispose();
+        this.shocks.splice(i, 1);
+        continue;
+      }
+      s.mesh.scale.setScalar(1 + t * s.radius);
+      s.mat.opacity = 0.85 * (1 - t);
     }
   }
 
   reset(): void {
-    for (const p of this.particles) {
-      p.mesh.visible = false;
-      this.pool.push(p);
-    }
-    this.particles.length = 0;
+    this.bursts.length = 0;
+    this.mesh.count = 0;
     this.trauma = 0;
+    for (const s of this.shocks) {
+      this.scene.remove(s.mesh);
+      s.geo.dispose();
+      s.mat.dispose();
+    }
+    this.shocks.length = 0;
   }
 
   dispose(): void {
     this.reset();
-    for (const p of this.pool) {
-      this.scene.remove(p.mesh);
-      (p.mesh.material as THREE.Material).dispose();
-    }
-    this.pool.length = 0;
+    this.scene.remove(this.mesh);
     this.geometry.dispose();
-  }
-
-  private acquire(): Particle {
-    const existing = this.pool.pop();
-    if (existing) return existing;
-    const mat = new THREE.MeshBasicMaterial({ color: '#ffffff' });
-    const mesh = new THREE.Mesh(this.geometry, mat);
-    mesh.visible = false;
-    this.scene.add(mesh);
-    return {
-      mesh,
-      velocity: new THREE.Vector3(),
-      life: 0,
-      maxLife: 1,
-      scale: 1,
-    };
+    this.material.dispose();
   }
 }

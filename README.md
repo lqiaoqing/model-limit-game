@@ -34,8 +34,18 @@ Open **http://127.0.0.1:5188/**
 
 Press **P** to pause, then toggle:
 
-- **极限压力 Stress** — immediate dense enemy flood (perf ceiling)
+- **极限压力 Stress** — dense enemy flood toward the ~500-unit perf ceiling
 - **低画质 Low Graphics** — bloom off, DPR 1, shadows off
+
+### Renderer backend
+
+Default is **WebGL2** (bloom PostFx). To opt into the **WebGPU skeleton** (no bloom):
+
+```
+http://127.0.0.1:5188/?renderer=webgpu
+```
+
+Requires `navigator.gpu`. Diagnostics include `backend` and `webgpuSupported`.
 
 ---
 

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { InputController, type InputFrame } from '../core/InputController';
 import { Loop } from '../core/Loop';
-import { createRenderer, resizeRenderer } from '../core/Renderer';
+import { createRenderBackend, initRenderBackend, resizeBackend, type RenderBackend } from '../core/RenderBackend';
 import { Cover } from '../entities/Cover';
 import { Pickup, type PickupKind } from '../entities/Pickup';
 import { Player, DEFAULT_PLAYER_STATS, type ArenaBounds } from '../entities/Player';
@@ -28,28 +28,15 @@ import {
 import { enemyFormTierForWave } from '../systems/EnemyAssets';
 import { createSeededRandom } from '../utils/random';
 import { WEAPON_DEFS, weaponAt, type WeaponId } from '../combat/Weapons';
-import {
-  ARC_CHAIN_DAMAGE,
-  ARC_CHAIN_RANGE,
-  CRIT_MULTIPLIER,
-  DASH_BLAST_DAMAGE,
-  DASH_BLAST_RADIUS,
-  OVERHEAT_EMP_DAMAGE,
-  OVERHEAT_EMP_RADIUS,
-  SCATTER_CLOSE_RANGE,
-  SHIELD_NOVA_DAMAGE,
-  SHIELD_NOVA_RADIUS,
-  createCombatModifiers,
-  modifierIds,
-  resetCombatModifiers,
-  type CombatModifiers,
-} from '../combat/CombatModifiers';
+import { createCombatModifiers, modifierIds, resetCombatModifiers, type CombatModifiers } from '../combat/CombatModifiers';
+import { CombatSystem } from '../combat/CombatSystem';
 import {
   advanceBossPhase,
   createBossRuntime,
   getBossPhase,
   type BossRuntime,
 } from '../systems/BossPhases';
+import { buildDiagnostics } from '../telemetry/buildDiagnostics';
 
 const ARENA: ArenaBounds = {
   halfWidth: 14,
@@ -75,7 +62,8 @@ const ENEMY_SEP_CELL = 2.4;
 const BASE_FOV = 48;
 
 export class Game {
-  private readonly renderer: THREE.WebGLRenderer;
+  private readonly backend: RenderBackend;
+  private readonly renderer: THREE.WebGLRenderer | import('three/webgpu').WebGPURenderer;
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.1, 140);
   private readonly input: InputController;
@@ -147,9 +135,9 @@ export class Game {
   /** Upgrade deltas relative to the *active* weapon def — never vs plasma defaults. */
   private weaponBonuses = { fireMul: 1, speedMul: 1, dmgBonus: 0 };
   private readonly combatMods: CombatModifiers = createCombatModifiers();
+  private combat!: CombatSystem;
   private bossRuntime: BossRuntime = createBossRuntime();
   private lastBossRef: Enemy | null = null;
-  private dashBlasts: Array<{ pos: THREE.Vector3; timer: number }> = [];
   private fps = 60;
   private stressMode = false;
   private lowGraphics = false;
@@ -162,19 +150,45 @@ export class Game {
   private upgradeStacks: Partial<Record<UpgradeId, number>> = {};
   private upgradeOffers: UpgradeOffer[] = [];
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
-    this.renderer = createRenderer(canvas);
+  constructor(
+    private readonly canvas: HTMLCanvasElement,
+    backend?: RenderBackend,
+  ) {
+    this.backend = backend ?? createRenderBackend(canvas);
+    this.renderer = this.backend.renderer;
     this.renderer.toneMappingExposure = this.tuning.exposure;
     this.feel = new GameFeel(BASE_FOV, this.camera);
-    this.postFx = new PostFx(this.renderer, this.scene, this.camera);
+    this.postFx =
+      this.backend.kind === 'webgl2'
+        ? new PostFx(this.backend.renderer as THREE.WebGLRenderer, this.scene, this.camera)
+        : null;
     this.crosshairEl = document.querySelector('#crosshair');
 
-    this.vfx = new VfxSystem(this.scene, () => this.rng());
+    this.vfx = new VfxSystem(this.scene, () => this.rng(), 4000);
     this.worldFx = new WorldFx(this.scene, () => this.rng(), ARENA);
     this.decals = new GroundDecals(this.scene, 48);
-    this.enemyBatch = new EnemyBatchRenderer(this.scene, 400);
-    this.projectiles = new ProjectilePool(this.scene, 200);
+    this.enemyBatch = new EnemyBatchRenderer(this.scene, 520);
+    this.projectiles = new ProjectilePool(this.scene, 2500);
     this.waves = new WaveDirector(this.scene, ARENA, () => this.rng());
+    this.combat = new CombatSystem({
+      player: this.player,
+      projectiles: this.projectiles,
+      waves: this.waves,
+      vfx: this.vfx,
+      audio: this.audio,
+      hud: this.hud,
+      feel: this.feel,
+      worldFx: this.worldFx,
+      decals: this.decals,
+      combatMods: this.combatMods,
+      getWeapon: () => this.weapon,
+      rng: () => this.rng(),
+      onEnemyKilled: (enemy, source) => this.onEnemyKilled(enemy, source),
+      onPlayerProjectileHit: () => {
+        this.lastDeathCause = 'projectile';
+        this.onPlayerHurt();
+      },
+    });
 
     const stick = this.getElement('#touch-stick');
     const knob = this.getElement('#touch-knob');
@@ -205,6 +219,10 @@ export class Game {
   }
 
   start(): void {
+    // WebGPU backend needs an async device init before first frame is useful.
+    void initRenderBackend(this.backend).catch(() => {
+      // Stay on the selected backend; first frames may no-op until ready.
+    });
     this.loop.start();
   }
 
@@ -319,24 +337,20 @@ export class Game {
     }
 
     if (dashStarted && this.combatMods.dashDetonation) {
-      this.dashBlasts.push({
-        pos: this.player.group.position.clone().setY(0.2),
-        timer: 0.28,
-      });
-      this.vfx.spawnBurst(this.player.group.position.clone().setY(0.2), '#f472b6', 6, 3.5);
+      this.combat.queueDashBlast(this.player.group.position);
     }
 
     if (this.player.overheatPulse) {
-      this.castOverheatEmp();
+      this.combat.castOverheatEmp();
     } else if (this.player.overheated && !beforeOverheat) {
       this.audio.overheat();
     }
 
     if (fire.fired) {
-      this.firePlayerWeapon();
+      this.combat.firePlayerWeapon();
     }
 
-    this.tickDashBlasts(delta);
+    this.combat.tickDashBlasts(delta);
 
     // Heat steam
     if (this.player.getHeatRatio() > 0.45 && this.rng() < 0.35) {
@@ -402,7 +416,7 @@ export class Game {
         if (hurt.hit) {
           this.lastDeathCause = enemy.stats.kind;
           this.onPlayerHurt();
-          if (hurt.shieldBroke) this.maybeShieldNova();
+          if (hurt.shieldBroke) this.combat.maybeShieldNova();
           // Shove the attacker back out so it cannot stay glued to the hull.
           const dist = Math.max(Math.sqrt(distSq), 0.0001);
           const strength = CONTACT_KNOCKBACK[enemy.stats.kind] ?? 8;
@@ -476,7 +490,7 @@ export class Game {
 
     this.tickBossLogic(delta);
     this.projectiles.update(delta);
-    this.resolveProjectileHits();
+    this.combat.resolveProjectileHits(ARENA, this.covers);
 
     if (this.comboTimer > 0) {
       this.comboTimer -= delta;
@@ -581,82 +595,6 @@ export class Game {
     return (cx + 512) * 1024 + (cz + 512);
   }
 
-  private resolveProjectileHits(): void {
-    for (const p of this.projectiles.projectiles) {
-      if (!p.active) continue;
-      const pos = p.group.position;
-
-      if (Math.abs(pos.x) > ARENA.halfWidth + 2 || Math.abs(pos.z) > ARENA.halfDepth + 2) {
-        p.deactivate();
-        continue;
-      }
-
-      let blocked = false;
-      for (const cover of this.covers) {
-        if (cover.blocksPoint(pos)) {
-          cover.takeDamage(p.damage * 0.5);
-          this.vfx.spawnBurst(pos, '#94a3b8', 4, 3);
-          p.deactivate();
-          blocked = true;
-          break;
-        }
-      }
-      if (blocked) continue;
-
-      if (p.owner === 'player') {
-        for (const enemy of this.waves.enemies) {
-          if (!enemy.alive) continue;
-          if (p.hitSet.has(enemy.group.uuid)) continue;
-          const dx = pos.x - enemy.group.position.x;
-          const dz = pos.z - enemy.group.position.z;
-          const rr = enemy.radius + p.radius;
-          if (dx * dx + dz * dz <= rr * rr) {
-            p.hitSet.add(enemy.group.uuid);
-            enemy.hitFlash();
-            let dmg = p.damage;
-            if (
-              this.combatMods.scatterCloseBonus &&
-              p.sourceWeapon === 'scatter' &&
-              pos.distanceTo(this.player.group.position) < SCATTER_CLOSE_RANGE
-            ) {
-              dmg *= 1.35;
-            }
-            // Rail Bore grows with targets already passed, not remaining pierce.
-            if (this.combatMods.railPierce > 0 && p.sourceWeapon === 'rail') {
-              dmg *= 1 + p.hitsLanded * 0.08;
-            }
-            p.hitsLanded += 1;
-            const died = enemy.takeDamage(dmg);
-            this.audio.hit();
-            this.vfx.spawnBurst(pos, p.crit ? '#fbbf24' : enemy.stats.color, p.crit ? 10 : 6, 5);
-            if (!died) this.decals.spawnImpact(pos, enemy.stats.color);
-            if (died) this.onEnemyKilled(enemy, p);
-            else this.feel.triggerHitstop(0.03);
-            if (p.pierce > 0) {
-              p.pierce -= 1;
-            } else {
-              p.deactivate();
-            }
-            break;
-          }
-        }
-      } else {
-        const dx = pos.x - this.player.group.position.x;
-        const dz = pos.z - this.player.group.position.z;
-        const rr = 0.55 + p.radius;
-        if (dx * dx + dz * dz <= rr * rr) {
-          const hurt = this.player.takeDamage(p.damage);
-          if (hurt.hit) {
-            this.lastDeathCause = 'projectile';
-            this.onPlayerHurt();
-            if (hurt.shieldBroke) this.maybeShieldNova();
-          }
-          p.deactivate();
-        }
-      }
-    }
-  }
-
   private onEnemyKilled(
     enemy: {
       stats: { score: number; kind: string; color?: string };
@@ -680,7 +618,7 @@ export class Game {
     }
 
     if (this.combatMods.arcChain > 0 && kind !== 'boss') {
-      this.spawnArcChains(enemy.group.position, this.combatMods.arcChain);
+      this.combat.spawnArcChains(enemy.group.position, this.combatMods.arcChain);
     }
 
     const pos = enemy.group.position;
@@ -764,126 +702,6 @@ export class Game {
     this.player.stats.heatPerShot = w.heatPerShot;
     this.player.stats.projectileSpeed = w.projectileSpeed * this.weaponBonuses.speedMul;
     this.player.stats.projectileDamage = Math.max(1, w.damage + this.weaponBonuses.dmgBonus);
-  }
-
-  private firePlayerWeapon(): void {
-    const w = WEAPON_DEFS[this.weapon];
-    this.audio.shoot();
-    this.tmp.dir.set(this.player.aim.x, 0, this.player.aim.y);
-    const pierce = w.id === 'rail' ? w.pierce + this.combatMods.railPierce : w.pierce;
-    const spread =
-      w.id === 'scatter' && this.combatMods.scatterCloseBonus ? w.spread * 0.72 : w.spread;
-    const up = new THREE.Vector3(0, 1, 0);
-    for (let i = 0; i < w.pellets; i += 1) {
-      const t = w.pellets === 1 ? 0 : i / (w.pellets - 1) - 0.5;
-      const angle = t * spread * 2;
-      const dir = this.tmp.dir.clone().applyAxisAngle(up, angle);
-      this.projectiles.spawn(
-        this.player.muzzle,
-        dir,
-        this.player.stats.projectileSpeed,
-        this.player.stats.projectileDamage,
-        'player',
-        w.color,
-        { pierce, sourceWeapon: w.id },
-      );
-    }
-    this.vfx.spawnBurst(this.player.muzzle, w.color, w.pellets > 1 ? 5 : 3, 3.5);
-    this.vfx.spawnBurst(
-      this.player.muzzle
-        .clone()
-        .add(new THREE.Vector3(-this.player.aim.y, 0.1, this.player.aim.x).multiplyScalar(0.2)),
-      '#fbbf24',
-      1,
-      2.2,
-    );
-    this.feel.triggerFovPunch(w.id === 'rail' ? 2.2 : 1.1);
-  }
-
-  private castOverheatEmp(): void {
-    this.audio.overheat();
-    this.hud.pushKillFeed('OVERHEAT · EMP', 'boss');
-    this.hud.showWaveBanner('EMP CASCADE', true);
-    this.vfx.spawnShockwave(this.player.group.position, '#f97316', OVERHEAT_EMP_RADIUS * 0.7);
-    this.worldFx.triggerPulse(this.player.group.position, '#f97316', OVERHEAT_EMP_RADIUS);
-    this.feel.triggerHitstop(0.1);
-    this.feel.triggerFovPunch(4);
-    const origin = this.player.group.position;
-    for (const enemy of this.waves.enemies) {
-      if (!enemy.alive) continue;
-      const dx = enemy.group.position.x - origin.x;
-      const dz = enemy.group.position.z - origin.z;
-      if (dx * dx + dz * dz <= OVERHEAT_EMP_RADIUS * OVERHEAT_EMP_RADIUS) {
-        enemy.staggerTimer = Math.max(enemy.staggerTimer, 0.55);
-        const died = enemy.takeDamage(OVERHEAT_EMP_DAMAGE);
-        this.vfx.spawnBurst(enemy.group.position.clone().setY(0.4), '#f97316', 8, 5);
-        if (died) this.onEnemyKilled(enemy);
-      }
-    }
-  }
-
-  private spawnArcChains(from: THREE.Vector3, count: number): void {
-    const candidates = this.waves.enemies
-      .filter((e) => e.alive)
-      .map((e) => ({
-        e,
-        d:
-          (e.group.position.x - from.x) * (e.group.position.x - from.x) +
-          (e.group.position.z - from.z) * (e.group.position.z - from.z),
-      }))
-      .filter((c) => c.d > 0.01 && c.d <= ARC_CHAIN_RANGE * ARC_CHAIN_RANGE)
-      .sort((a, b) => a.d - b.d)
-      .slice(0, count);
-
-    for (const { e } of candidates) {
-      let dmg = ARC_CHAIN_DAMAGE;
-      const crit = this.combatMods.critConductor && this.rng() < 0.35;
-      if (crit) dmg *= CRIT_MULTIPLIER;
-      this.vfx.spawnBurst(e.group.position.clone().setY(0.5), crit ? '#fbbf24' : '#38bdf8', 7, 4.5);
-      const died = e.takeDamage(dmg);
-      this.audio.hit();
-      if (died) this.onEnemyKilled(e);
-      else e.staggerTimer = Math.max(e.staggerTimer, 0.12);
-    }
-  }
-
-  private maybeShieldNova(): void {
-    if (!this.combatMods.shieldNova) return;
-    this.hud.pushKillFeed('SHIELD NOVA', 'ranged');
-    this.vfx.spawnShockwave(this.player.group.position, '#3ec6ff', SHIELD_NOVA_RADIUS * 0.75);
-    const origin = this.player.group.position;
-    for (const enemy of this.waves.enemies) {
-      if (!enemy.alive) continue;
-      const dx = enemy.group.position.x - origin.x;
-      const dz = enemy.group.position.z - origin.z;
-      const distSq = dx * dx + dz * dz;
-      if (distSq > SHIELD_NOVA_RADIUS * SHIELD_NOVA_RADIUS) continue;
-      const dist = Math.max(Math.sqrt(distSq), 0.0001);
-      enemy.knockback(dx / dist, dz / dist, 14, 0.2);
-      const died = enemy.takeDamage(SHIELD_NOVA_DAMAGE);
-      if (died) this.onEnemyKilled(enemy);
-    }
-  }
-
-  private tickDashBlasts(delta: number): void {
-    for (let i = this.dashBlasts.length - 1; i >= 0; i -= 1) {
-      const blast = this.dashBlasts[i];
-      blast.timer -= delta;
-      if (blast.timer > 0) continue;
-      this.vfx.spawnShockwave(blast.pos, '#f472b6', DASH_BLAST_RADIUS * 0.8);
-      this.worldFx.triggerPulse(blast.pos, '#f472b6', DASH_BLAST_RADIUS);
-      this.feel.triggerFovPunch(2);
-      for (const enemy of this.waves.enemies) {
-        if (!enemy.alive) continue;
-        const dx = enemy.group.position.x - blast.pos.x;
-        const dz = enemy.group.position.z - blast.pos.z;
-        if (dx * dx + dz * dz > DASH_BLAST_RADIUS * DASH_BLAST_RADIUS) continue;
-        const died = enemy.takeDamage(DASH_BLAST_DAMAGE);
-        this.vfx.spawnBurst(enemy.group.position.clone().setY(0.4), '#f472b6', 6, 4);
-        if (died) this.onEnemyKilled(enemy);
-      }
-      this.dashBlasts.splice(i, 1);
-    }
   }
 
   private updateBossPhase(enemy: Enemy): void {
@@ -1133,7 +951,7 @@ export class Game {
     resetCombatModifiers(this.combatMods);
     this.bossRuntime = createBossRuntime();
     this.lastBossRef = null;
-    this.dashBlasts = [];
+    this.combat.reset();
     this.hud.hideUpgradeCards();
     this.hud.setActiveWeapon('plasma');
     this.feel.reset();
@@ -1165,14 +983,22 @@ export class Game {
   private render(): void {
     this.renderer.info.reset();
     const rendered = this.postFx?.render();
-    if (!rendered) this.renderer.render(this.scene, this.camera);
+    if (!rendered) {
+      const maybePromise = (
+        this.renderer as THREE.WebGLRenderer
+      ).render(this.scene, this.camera) as unknown;
+      // WebGPURenderer.render returns a Promise — ignore it (fire-and-forget).
+      if (maybePromise && typeof (maybePromise as Promise<void>).catch === 'function') {
+        (maybePromise as Promise<void>).catch(() => undefined);
+      }
+    }
   }
 
   private syncPostSize(): void {
     const width = Math.max(1, Math.floor(this.canvas.clientWidth));
     const height = Math.max(1, Math.floor(this.canvas.clientHeight));
     const dpr = Math.min(window.devicePixelRatio || 1, this.tuning.maxDpr);
-    resizeRenderer(this.renderer, this.camera, this.tuning.maxDpr);
+    resizeBackend(this.backend, this.camera, this.tuning.maxDpr);
     this.postFx?.setSize(width, height, dpr);
   }
 
@@ -1926,11 +1752,10 @@ export class Game {
   private publishDiagnostics(): void {
     const info = this.renderer.info;
     const waveState = this.waves.getState();
-    window.__THREE_GAME_DIAGNOSTICS__ = {
+    window.__THREE_GAME_DIAGNOSTICS__ = buildDiagnostics({
       frame: this.frame,
       elapsed: this.elapsed,
       score: this.score,
-      complete: this.mode === 'dead',
       mode: this.mode,
       wave: waveState.wave,
       enemies: waveState.alive,
@@ -1945,6 +1770,10 @@ export class Game {
       bossPhase: this.waves.boss ? this.bossRuntime.phase : null,
       playerFormTier: this.player.getFormTier(),
       enemyFormTier: enemyFormTierForWave(waveState.wave),
+      projectiles: this.projectiles.activeCount(),
+      particles: this.vfx.activeCount(),
+      backend: this.backend.kind,
+      webgpuSupported: this.backend.webgpuSupported,
       player: {
         hp: this.player.hp,
         shield: this.player.shield,
@@ -1956,14 +1785,13 @@ export class Game {
         projectileDamage: this.player.stats.projectileDamage,
         projectileSpeed: this.player.stats.projectileSpeed,
         heatPerShot: this.player.stats.heatPerShot,
+        speed: this.player.velocity.length(),
         position: {
           x: this.player.group.position.x,
           y: this.player.group.position.y,
           z: this.player.group.position.z,
         },
-        speed: this.player.velocity.length(),
       },
-      projectiles: this.projectiles.activeCount(),
       renderer: {
         calls: info.render.calls,
         triangles: info.render.triangles,
@@ -1977,7 +1805,7 @@ export class Game {
         height: this.canvas.height,
         dpr: Math.min(window.devicePixelRatio || 1, this.tuning.maxDpr),
       },
-    };
+    });
   }
 
   private getElement(selector: string): HTMLElement {
