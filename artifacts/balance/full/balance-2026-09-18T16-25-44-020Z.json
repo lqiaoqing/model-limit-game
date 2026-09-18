@@ -1,0 +1,1261 @@
+{
+  "meta": {
+    "generatedAt": "2026-09-18T16:25:44.020Z",
+    "profile": "full",
+    "seeds": [
+      42,
+      137,
+      999,
+      2026,
+      65535
+    ],
+    "durationSec": 12,
+    "expectedRuns": 20,
+    "pageErrors": []
+  },
+  "aggregate": {
+    "meanDps": 7.27,
+    "weaponRows": [
+      {
+        "weapon": "plasma",
+        "runs": 5,
+        "killsAvg": 1.4,
+        "scoreAvg": 146,
+        "dpsAvg": 8.06,
+        "killsPerSecAvg": 0.12,
+        "damageDealtAvg": 98.4,
+        "deathsAvg": 0,
+        "overheatedRatioAvg": 0,
+        "fpsAvg": 55,
+        "fpsP50Avg": 55.5,
+        "fpsP95Avg": 56.4,
+        "frameMsP50Avg": 17.9,
+        "frameMsP95Avg": 19,
+        "frameMsP99Avg": 22.9,
+        "balanceNote": "ok"
+      },
+      {
+        "weapon": "rail",
+        "runs": 5,
+        "killsAvg": 1.6,
+        "scoreAvg": 175,
+        "dpsAvg": 4.41,
+        "killsPerSecAvg": 0.13,
+        "damageDealtAvg": 54.4,
+        "deathsAvg": 0,
+        "overheatedRatioAvg": 0,
+        "fpsAvg": 55,
+        "fpsP50Avg": 55.3,
+        "fpsP95Avg": 56.4,
+        "frameMsP50Avg": 17.9,
+        "frameMsP95Avg": 19.3,
+        "frameMsP99Avg": 26.7,
+        "balanceNote": "weak?"
+      },
+      {
+        "weapon": "scatter",
+        "runs": 5,
+        "killsAvg": 2.4,
+        "scoreAvg": 258,
+        "dpsAvg": 7.12,
+        "killsPerSecAvg": 0.2,
+        "damageDealtAvg": 86.8,
+        "deathsAvg": 0,
+        "overheatedRatioAvg": 0,
+        "fpsAvg": 55.2,
+        "fpsP50Avg": 55.6,
+        "fpsP95Avg": 56.4,
+        "frameMsP50Avg": 17.9,
+        "frameMsP95Avg": 19,
+        "frameMsP99Avg": 22.7,
+        "balanceNote": "ok"
+      },
+      {
+        "weapon": "launcher",
+        "runs": 5,
+        "killsAvg": 3.2,
+        "scoreAvg": 380,
+        "dpsAvg": 9.5,
+        "killsPerSecAvg": 0.26,
+        "damageDealtAvg": 117.66,
+        "deathsAvg": 0,
+        "overheatedRatioAvg": 0,
+        "fpsAvg": 55.4,
+        "fpsP50Avg": 55.7,
+        "fpsP95Avg": 56.4,
+        "frameMsP50Avg": 17.9,
+        "frameMsP95Avg": 19,
+        "frameMsP99Avg": 26,
+        "balanceNote": "OP?"
+      }
+    ],
+    "upgradePickCounts": {},
+    "totalRuns": 20
+  },
+  "runs": [
+    {
+      "seed": 42,
+      "weapon": "plasma",
+      "wallSec": 12.15,
+      "kills": 2,
+      "score": 215,
+      "dps": 11.55,
+      "killsPerSec": 0.16,
+      "damageDealt": 144,
+      "combatTime": 12.47,
+      "shotsFired": 95,
+      "hitsLanded": 12,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.11,
+        "projectileDamage": 12
+      },
+      "frameMs": {
+        "p50": 17.7,
+        "p95": 18.3,
+        "p99": 18.7
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "plasma": 144
+        },
+        "killsByWeapon": {
+          "plasma": 2
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 2
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 55.3,
+        "fpsP50": 56.4,
+        "fpsP95": 57,
+        "fpsMin": 16.095654173373184,
+        "frameMsP50": 17.7,
+        "frameMsP95": 18.3,
+        "frameMsP99": 18.7,
+        "projectilesEnd": 4,
+        "particlesEnd": 37,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 42,
+      "weapon": "rail",
+      "wallSec": 12.06,
+      "kills": 2,
+      "score": 215,
+      "dps": 5.54,
+      "killsPerSec": 0.17,
+      "damageDealt": 68,
+      "combatTime": 12.27,
+      "shotsFired": 28,
+      "hitsLanded": 2,
+      "deaths": 0,
+      "dashes": 8,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.42,
+        "projectileDamage": 34
+      },
+      "frameMs": {
+        "p50": 18.1,
+        "p95": 19.6,
+        "p99": 20.6
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "rail": 68
+        },
+        "killsByWeapon": {
+          "rail": 2
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 2
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 54.8,
+        "fpsP50": 55,
+        "fpsP95": 56.4,
+        "fpsMin": 51.244509516837574,
+        "frameMsP50": 18.1,
+        "frameMsP95": 19.6,
+        "frameMsP99": 20.6,
+        "projectilesEnd": 0,
+        "particlesEnd": 13,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 42,
+      "weapon": "scatter",
+      "wallSec": 12.09,
+      "kills": 2,
+      "score": 215,
+      "dps": 4.58,
+      "killsPerSec": 0.17,
+      "damageDealt": 56,
+      "combatTime": 12.23,
+      "shotsFired": 155,
+      "hitsLanded": 8,
+      "deaths": 0,
+      "dashes": 8,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.38,
+        "projectileDamage": 7
+      },
+      "frameMs": {
+        "p50": 18.1,
+        "p95": 19.9,
+        "p99": 36.6
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "scatter": 56
+        },
+        "killsByWeapon": {
+          "scatter": 2
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 2
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 53.9,
+        "fpsP50": 54.9,
+        "fpsP95": 56,
+        "fpsMin": 50.420168067226896,
+        "frameMsP50": 18.1,
+        "frameMsP95": 19.9,
+        "frameMsP99": 36.6,
+        "projectilesEnd": 6,
+        "particlesEnd": 50,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 42,
+      "weapon": "launcher",
+      "wallSec": 12.14,
+      "kills": 3,
+      "score": 345,
+      "dps": 9.25,
+      "killsPerSec": 0.25,
+      "damageDealt": 115.02324625319443,
+      "combatTime": 12.44,
+      "shotsFired": 17,
+      "hitsLanded": 7,
+      "deaths": 0,
+      "dashes": 8,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.72,
+        "projectileDamage": 26
+      },
+      "frameMs": {
+        "p50": 18.1,
+        "p95": 19.7,
+        "p99": 35.7
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "launcher": 115.02324625319443
+        },
+        "killsByWeapon": {
+          "launcher": 3
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 3
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 54.7,
+        "fpsP50": 55.1,
+        "fpsP95": 56.2,
+        "fpsMin": 52.00594353640377,
+        "frameMsP50": 18.1,
+        "frameMsP95": 19.7,
+        "frameMsP99": 35.7,
+        "projectilesEnd": 1,
+        "particlesEnd": 17,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 137,
+      "weapon": "plasma",
+      "wallSec": 12.03,
+      "kills": 2,
+      "score": 215,
+      "dps": 10,
+      "killsPerSec": 0.17,
+      "damageDealt": 120,
+      "combatTime": 12,
+      "shotsFired": 96,
+      "hitsLanded": 10,
+      "deaths": 0,
+      "dashes": 8,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.11,
+        "projectileDamage": 12
+      },
+      "frameMs": {
+        "p50": 18.1,
+        "p95": 19.9,
+        "p99": 21.4
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "plasma": 120
+        },
+        "killsByWeapon": {
+          "plasma": 2
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 2
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 54.6,
+        "fpsP50": 55,
+        "fpsP95": 55.8,
+        "fpsMin": 51.18206190592212,
+        "frameMsP50": 18.1,
+        "frameMsP95": 19.9,
+        "frameMsP99": 21.4,
+        "projectilesEnd": 5,
+        "particlesEnd": 28,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 137,
+      "weapon": "rail",
+      "wallSec": 12.16,
+      "kills": 3,
+      "score": 345,
+      "dps": 8.26,
+      "killsPerSec": 0.25,
+      "damageDealt": 102,
+      "combatTime": 12.35,
+      "shotsFired": 28,
+      "hitsLanded": 3,
+      "deaths": 0,
+      "dashes": 8,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.42,
+        "projectileDamage": 34
+      },
+      "frameMs": {
+        "p50": 18.1,
+        "p95": 19.7,
+        "p99": 36.4
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "rail": 102
+        },
+        "killsByWeapon": {
+          "rail": 3
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 3
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 53.8,
+        "fpsP50": 54.6,
+        "fpsP95": 56,
+        "fpsMin": 49.78839930296186,
+        "frameMsP50": 18.1,
+        "frameMsP95": 19.7,
+        "frameMsP99": 36.4,
+        "projectilesEnd": 0,
+        "particlesEnd": 13,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 137,
+      "weapon": "scatter",
+      "wallSec": 12.31,
+      "kills": 3,
+      "score": 315,
+      "dps": 8.58,
+      "killsPerSec": 0.24,
+      "damageDealt": 105,
+      "combatTime": 12.24,
+      "shotsFired": 155,
+      "hitsLanded": 15,
+      "deaths": 0,
+      "dashes": 8,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.38,
+        "projectileDamage": 7
+      },
+      "frameMs": {
+        "p50": 18,
+        "p95": 19.4,
+        "p99": 20
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "scatter": 105
+        },
+        "killsByWeapon": {
+          "scatter": 3
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 3
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 53.8,
+        "fpsP50": 54.5,
+        "fpsP95": 56.1,
+        "fpsMin": 46.31886884446643,
+        "frameMsP50": 18,
+        "frameMsP95": 19.4,
+        "frameMsP99": 20,
+        "projectilesEnd": 5,
+        "particlesEnd": 21,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 137,
+      "weapon": "launcher",
+      "wallSec": 12.1,
+      "kills": 6,
+      "score": 825,
+      "dps": 15.95,
+      "killsPerSec": 0.5,
+      "damageDealt": 196.3294245125976,
+      "combatTime": 12.31,
+      "shotsFired": 17,
+      "hitsLanded": 12,
+      "deaths": 0,
+      "dashes": 8,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.72,
+        "projectileDamage": 26
+      },
+      "frameMs": {
+        "p50": 17.9,
+        "p95": 19.8,
+        "p99": 37.3
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "launcher": 196.3294245125976
+        },
+        "killsByWeapon": {
+          "launcher": 6
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 6
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 54.3,
+        "fpsP50": 54.8,
+        "fpsP95": 55.7,
+        "fpsMin": 48.43787842092583,
+        "frameMsP50": 17.9,
+        "frameMsP95": 19.8,
+        "frameMsP99": 37.3,
+        "projectilesEnd": 1,
+        "particlesEnd": 13,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 999,
+      "weapon": "plasma",
+      "wallSec": 12.05,
+      "kills": 2,
+      "score": 200,
+      "dps": 7.96,
+      "killsPerSec": 0.17,
+      "damageDealt": 96,
+      "combatTime": 12.06,
+      "shotsFired": 97,
+      "hitsLanded": 8,
+      "deaths": 0,
+      "dashes": 8,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.11,
+        "projectileDamage": 12
+      },
+      "frameMs": {
+        "p50": 18.1,
+        "p95": 19.8,
+        "p99": 37.1
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "plasma": 96
+        },
+        "killsByWeapon": {
+          "plasma": 2
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 2
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 53.8,
+        "fpsP50": 54.5,
+        "fpsP95": 55.9,
+        "fpsMin": 45.641259698767975,
+        "frameMsP50": 18.1,
+        "frameMsP95": 19.8,
+        "frameMsP99": 37.1,
+        "projectilesEnd": 3,
+        "particlesEnd": 54,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 999,
+      "weapon": "rail",
+      "wallSec": 12.09,
+      "kills": 0,
+      "score": 0,
+      "dps": 0,
+      "killsPerSec": 0,
+      "damageDealt": 0,
+      "combatTime": 12.47,
+      "shotsFired": 29,
+      "hitsLanded": 0,
+      "deaths": 0,
+      "dashes": 8,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.42,
+        "projectileDamage": 34
+      },
+      "frameMs": {
+        "p50": 17.9,
+        "p95": 20,
+        "p99": 38.5
+      },
+      "telemetry": {
+        "damageByWeapon": {},
+        "killsByWeapon": {},
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {},
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 54.4,
+        "fpsP50": 54.7,
+        "fpsP95": 56.3,
+        "fpsMin": 51.48320666829994,
+        "frameMsP50": 17.9,
+        "frameMsP95": 20,
+        "frameMsP99": 38.5,
+        "projectilesEnd": 1,
+        "particlesEnd": 14,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 999,
+      "weapon": "scatter",
+      "wallSec": 12.1,
+      "kills": 2,
+      "score": 215,
+      "dps": 7.56,
+      "killsPerSec": 0.17,
+      "damageDealt": 91,
+      "combatTime": 12.03,
+      "shotsFired": 150,
+      "hitsLanded": 13,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.38,
+        "projectileDamage": 7
+      },
+      "frameMs": {
+        "p50": 17.7,
+        "p95": 18.4,
+        "p99": 18.8
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "scatter": 91
+        },
+        "killsByWeapon": {
+          "scatter": 2
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 2
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 55.9,
+        "fpsP50": 56.2,
+        "fpsP95": 56.7,
+        "fpsMin": 52.34297108674015,
+        "frameMsP50": 17.7,
+        "frameMsP95": 18.4,
+        "frameMsP99": 18.8,
+        "projectilesEnd": 6,
+        "particlesEnd": 19,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 999,
+      "weapon": "launcher",
+      "wallSec": 12.13,
+      "kills": 2,
+      "score": 215,
+      "dps": 5.17,
+      "killsPerSec": 0.16,
+      "damageDealt": 64.15887593849584,
+      "combatTime": 12.41,
+      "shotsFired": 17,
+      "hitsLanded": 4,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.72,
+        "projectileDamage": 26
+      },
+      "frameMs": {
+        "p50": 17.8,
+        "p95": 18.4,
+        "p99": 18.7
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "launcher": 64.15887593849584
+        },
+        "killsByWeapon": {
+          "launcher": 2
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 2
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 56.2,
+        "fpsP50": 56.3,
+        "fpsP95": 57,
+        "fpsMin": 53.78858746491975,
+        "frameMsP50": 17.8,
+        "frameMsP95": 18.4,
+        "frameMsP99": 18.7,
+        "projectilesEnd": 1,
+        "particlesEnd": 10,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 2026,
+      "weapon": "plasma",
+      "wallSec": 12.13,
+      "kills": 1,
+      "score": 100,
+      "dps": 2.92,
+      "killsPerSec": 0.08,
+      "damageDealt": 36,
+      "combatTime": 12.35,
+      "shotsFired": 97,
+      "hitsLanded": 3,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.11,
+        "projectileDamage": 12
+      },
+      "frameMs": {
+        "p50": 17.9,
+        "p95": 18.6,
+        "p99": 18.8
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "plasma": 36
+        },
+        "killsByWeapon": {
+          "plasma": 1
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 1
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 56.2,
+        "fpsP50": 56.3,
+        "fpsP95": 56.6,
+        "fpsMin": 55.435044589058364,
+        "frameMsP50": 17.9,
+        "frameMsP95": 18.6,
+        "frameMsP99": 18.8,
+        "projectilesEnd": 2,
+        "particlesEnd": 43,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 2026,
+      "weapon": "rail",
+      "wallSec": 12.19,
+      "kills": 3,
+      "score": 315,
+      "dps": 8.23,
+      "killsPerSec": 0.25,
+      "damageDealt": 102,
+      "combatTime": 12.4,
+      "shotsFired": 29,
+      "hitsLanded": 3,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.42,
+        "projectileDamage": 34
+      },
+      "frameMs": {
+        "p50": 17.8,
+        "p95": 18.7,
+        "p99": 19.1
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "rail": 102
+        },
+        "killsByWeapon": {
+          "rail": 3
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 3
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 56,
+        "fpsP50": 56,
+        "fpsP95": 56.5,
+        "fpsMin": 55.394990366087065,
+        "frameMsP50": 17.8,
+        "frameMsP95": 18.7,
+        "frameMsP99": 19.1,
+        "projectilesEnd": 1,
+        "particlesEnd": 19,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 2026,
+      "weapon": "scatter",
+      "wallSec": 12.28,
+      "kills": 3,
+      "score": 345,
+      "dps": 10.35,
+      "killsPerSec": 0.24,
+      "damageDealt": 126,
+      "combatTime": 12.17,
+      "shotsFired": 155,
+      "hitsLanded": 18,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.38,
+        "projectileDamage": 7
+      },
+      "frameMs": {
+        "p50": 17.8,
+        "p95": 18.5,
+        "p99": 18.9
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "scatter": 126
+        },
+        "killsByWeapon": {
+          "scatter": 3
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 3
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 56.2,
+        "fpsP50": 56.2,
+        "fpsP95": 56.6,
+        "fpsMin": 55.85235551238621,
+        "frameMsP50": 17.8,
+        "frameMsP95": 18.5,
+        "frameMsP99": 18.9,
+        "projectilesEnd": 5,
+        "particlesEnd": 41,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 2026,
+      "weapon": "launcher",
+      "wallSec": 12.13,
+      "kills": 3,
+      "score": 315,
+      "dps": 8.41,
+      "killsPerSec": 0.25,
+      "damageDealt": 104.2648723760684,
+      "combatTime": 12.4,
+      "shotsFired": 17,
+      "hitsLanded": 7,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.72,
+        "projectileDamage": 26
+      },
+      "frameMs": {
+        "p50": 17.8,
+        "p95": 18.6,
+        "p99": 19.1
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "launcher": 104.2648723760684
+        },
+        "killsByWeapon": {
+          "launcher": 3
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 3
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 56,
+        "fpsP50": 56.1,
+        "fpsP95": 56.4,
+        "fpsMin": 53.9744847890119,
+        "frameMsP50": 17.8,
+        "frameMsP95": 18.6,
+        "frameMsP99": 19.1,
+        "projectilesEnd": 1,
+        "particlesEnd": 13,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 65535,
+      "weapon": "plasma",
+      "wallSec": 12.1,
+      "kills": 0,
+      "score": 0,
+      "dps": 7.88,
+      "killsPerSec": 0,
+      "damageDealt": 96,
+      "combatTime": 12.18,
+      "shotsFired": 97,
+      "hitsLanded": 8,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.11,
+        "projectileDamage": 12
+      },
+      "frameMs": {
+        "p50": 17.7,
+        "p95": 18.5,
+        "p99": 18.7
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "plasma": 96
+        },
+        "killsByWeapon": {},
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {},
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 55,
+        "fpsP50": 55.2,
+        "fpsP95": 56.7,
+        "fpsMin": 46.61432777232515,
+        "frameMsP50": 17.7,
+        "frameMsP95": 18.5,
+        "frameMsP99": 18.7,
+        "projectilesEnd": 4,
+        "particlesEnd": 40,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 65535,
+      "weapon": "rail",
+      "wallSec": 12.33,
+      "kills": 0,
+      "score": 0,
+      "dps": 0,
+      "killsPerSec": 0,
+      "damageDealt": 0,
+      "combatTime": 12.7,
+      "shotsFired": 29,
+      "hitsLanded": 0,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.42,
+        "projectileDamage": 34
+      },
+      "frameMs": {
+        "p50": 17.8,
+        "p95": 18.7,
+        "p99": 18.9
+      },
+      "telemetry": {
+        "damageByWeapon": {},
+        "killsByWeapon": {},
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {},
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 56.1,
+        "fpsP50": 56.1,
+        "fpsP95": 56.7,
+        "fpsMin": 55.02392344497606,
+        "frameMsP50": 17.8,
+        "frameMsP95": 18.7,
+        "frameMsP99": 18.9,
+        "projectilesEnd": 1,
+        "particlesEnd": 9,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 65535,
+      "weapon": "scatter",
+      "wallSec": 12.25,
+      "kills": 2,
+      "score": 200,
+      "dps": 4.54,
+      "killsPerSec": 0.16,
+      "damageDealt": 56,
+      "combatTime": 12.35,
+      "shotsFired": 155,
+      "hitsLanded": 8,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.38,
+        "projectileDamage": 7
+      },
+      "frameMs": {
+        "p50": 17.8,
+        "p95": 18.6,
+        "p99": 19
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "scatter": 56
+        },
+        "killsByWeapon": {
+          "scatter": 2
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 2
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 56,
+        "fpsP50": 56,
+        "fpsP95": 56.5,
+        "fpsMin": 55.328361799376864,
+        "frameMsP50": 17.8,
+        "frameMsP95": 18.6,
+        "frameMsP99": 19,
+        "projectilesEnd": 3,
+        "particlesEnd": 27,
+        "backend": "webgl2"
+      }
+    },
+    {
+      "seed": 65535,
+      "weapon": "launcher",
+      "wallSec": 12.17,
+      "kills": 2,
+      "score": 200,
+      "dps": 8.74,
+      "killsPerSec": 0.16,
+      "damageDealt": 108.54003449494549,
+      "combatTime": 12.42,
+      "shotsFired": 17,
+      "hitsLanded": 7,
+      "deaths": 0,
+      "dashes": 9,
+      "upgradePicks": 0,
+      "overheatedRatio": 0,
+      "endWave": 1,
+      "endMode": "play",
+      "endHp": 100,
+      "endModifiers": [],
+      "endUpgrades": {},
+      "weaponStats": {
+        "fireInterval": 0.72,
+        "projectileDamage": 26
+      },
+      "frameMs": {
+        "p50": 17.8,
+        "p95": 18.6,
+        "p99": 19.1
+      },
+      "telemetry": {
+        "damageByWeapon": {
+          "launcher": 108.54003449494549
+        },
+        "killsByWeapon": {
+          "launcher": 2
+        },
+        "damageByUpgrade": {},
+        "damageByHazard": {},
+        "damageTakenBySource": {},
+        "enemyKillsByType": {
+          "chaser": 2
+        },
+        "bossPhaseDeaths": 0,
+        "hazardKills": 0
+      },
+      "perf": {
+        "fpsAvg": 56,
+        "fpsP50": 56.1,
+        "fpsP95": 56.5,
+        "fpsMin": 53.80288579114772,
+        "frameMsP50": 17.8,
+        "frameMsP95": 18.6,
+        "frameMsP99": 19.1,
+        "projectilesEnd": 1,
+        "particlesEnd": 11,
+        "backend": "webgl2"
+      }
+    }
+  ]
+}

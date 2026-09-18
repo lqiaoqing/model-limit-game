@@ -1,11 +1,13 @@
 /**
  * Multi-seed balance harness.
  * For each seed × weapon, run a short scripted bot session and aggregate
- * combat/perf telemetry into artifacts/balance/.
+ * combat/perf telemetry into artifacts/balance/{smoke|full}/.
  *
  * Usage:
- *   npm run balance
- *   node scripts/balance-harness.mjs --seeds 42,137 --duration 10
+ *   npm run balance:full
+ *   npm run balance:smoke
+ *   node scripts/balance-harness.mjs --profile full
+ *   node scripts/balance-harness.mjs --profile smoke --seeds 42,137 --duration 8
  */
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -14,17 +16,32 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const outDir = path.join(root, 'artifacts', 'balance');
+
+const FULL_SEEDS = [42, 137, 999, 2026, 65535];
+const SMOKE_SEEDS = [42, 137];
+const FULL_DURATION_SEC = 12;
+const SMOKE_DURATION_SEC = 8;
+
+function profileOutDir(profile) {
+  return path.join(root, 'artifacts', 'balance', profile);
+}
 
 function parseArgs(argv) {
   const args = {
-    seeds: [42, 137, 999, 2026, 65535],
-    durationSec: 12,
+    profile: 'full',
+    seeds: null,
+    durationSec: null,
     port: 5188,
   };
   for (let i = 2; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a === '--seeds') {
+    if (a === '--profile') {
+      const p = String(argv[++i] ?? '').toLowerCase();
+      if (p !== 'smoke' && p !== 'full') {
+        throw new Error(`Invalid --profile ${p} (expected smoke|full)`);
+      }
+      args.profile = p;
+    } else if (a === '--seeds') {
       args.seeds = String(argv[++i] ?? '')
         .split(',')
         .map((s) => Number(s.trim()))
@@ -35,6 +52,14 @@ function parseArgs(argv) {
       args.port = Number(argv[++i]);
     }
   }
+  // Defaults follow profile so smoke/full never share an output directory.
+  if (args.seeds == null) {
+    args.seeds = args.profile === 'smoke' ? [...SMOKE_SEEDS] : [...FULL_SEEDS];
+  }
+  if (args.durationSec == null) {
+    args.durationSec = args.profile === 'smoke' ? SMOKE_DURATION_SEC : FULL_DURATION_SEC;
+  }
+  args.outDir = profileOutDir(args.profile);
   return args;
 }
 
@@ -267,6 +292,7 @@ function aggregate(runs) {
       scoreAvg: avg('score'),
       dpsAvg: avg('dps'),
       killsPerSecAvg: avg('killsPerSec'),
+      damageDealtAvg: avg('damageDealt'),
       deathsAvg: avg('deaths'),
       overheatedRatioAvg: avg('overheatedRatio'),
       fpsAvg: avgPerf('fpsAvg'),
@@ -313,6 +339,7 @@ function renderScorecard({ meta, aggregate: agg, runs }) {
   lines.push('# Balance Scorecard');
   lines.push('');
   lines.push(`- Generated: ${meta.generatedAt}`);
+  lines.push(`- Profile: ${meta.profile ?? 'full'}`);
   lines.push(`- Seeds: ${meta.seeds.join(', ')}`);
   lines.push(`- Session duration: ${meta.durationSec}s per seed × weapon`);
   lines.push(`- Runs: ${agg.totalRuns}`);
@@ -321,12 +348,12 @@ function renderScorecard({ meta, aggregate: agg, runs }) {
   lines.push('## Weapon balance');
   lines.push('');
   lines.push(
-    '| Weapon | Kills avg | DPS avg | Kills/s | Deaths avg | Overheat | Frame p50/p99 | FPS p50 | Note |',
+    '| Weapon | Kills avg | DPS avg | Damage | Kills/s | Deaths avg | Overheat | Frame p50/p95/p99 | FPS p50 | Note |',
   );
-  lines.push('|---|---:|---:|---:|---:|---:|---:|---:|---|');
+  lines.push('|---|---:|---:|---:|---:|---:|---:|---:|---:|---|');
   for (const row of agg.weaponRows) {
     lines.push(
-      `| ${row.weapon} | ${row.killsAvg} | ${row.dpsAvg} | ${row.killsPerSecAvg} | ${row.deathsAvg} | ${row.overheatedRatioAvg} | ${row.frameMsP50Avg} / ${row.frameMsP99Avg} | ${row.fpsP50Avg} | ${row.balanceNote} |`,
+      `| ${row.weapon} | ${row.killsAvg} | ${row.dpsAvg} | ${row.damageDealtAvg ?? '—'} | ${row.killsPerSecAvg} | ${row.deathsAvg} | ${row.overheatedRatioAvg} | ${row.frameMsP50Avg} / ${row.frameMsP95Avg} / ${row.frameMsP99Avg} | ${row.fpsP50Avg} | ${row.balanceNote} |`,
     );
   }
   lines.push('');
@@ -357,7 +384,9 @@ function renderScorecard({ meta, aggregate: agg, runs }) {
   lines.push('');
   lines.push('- Bot is deterministic input, not a skilled player; use for regression + relative weapon comparison.');
   lines.push('- `OP?` / `weak?` flags are heuristic (±20% of mean DPS).');
-  lines.push('- Rerun: `npm run balance`');
+  lines.push('- Canonical full evidence lives under `artifacts/balance/full/`.');
+  lines.push('- Smoke evidence lives under `artifacts/balance/smoke/` and never overwrites full.');
+  lines.push('- Rerun full: `npm run balance:full` · Rerun smoke: `npm run balance:smoke`');
   lines.push('');
   return lines.join('\n');
 }
@@ -365,6 +394,7 @@ function renderScorecard({ meta, aggregate: agg, runs }) {
 async function main() {
   const args = parseArgs(process.argv);
   const url = `http://127.0.0.1:${args.port}/`;
+  const outDir = args.outDir;
   await mkdir(outDir, { recursive: true });
 
   let server = null;
@@ -419,8 +449,10 @@ async function main() {
   const agg = aggregate(runs);
   const meta = {
     generatedAt: new Date().toISOString(),
+    profile: args.profile,
     seeds: args.seeds,
     durationSec: args.durationSec,
+    expectedRuns: args.seeds.length * WEAPONS.length,
     pageErrors,
   };
   const payload = { meta, aggregate: agg, runs };
@@ -431,7 +463,9 @@ async function main() {
   await writeFile(path.join(outDir, 'balance-report.md'), md);
   await writeFile(path.join(outDir, 'scorecard.md'), md);
 
-  console.log(`\nWrote ${path.join(outDir, 'balance-report.md')}`);
+  console.log(`\nProfile ${args.profile} → ${outDir}`);
+  console.log(`Runs ${agg.totalRuns} (seeds=${args.seeds.join(',')} × weapons=${WEAPONS.length})`);
+  console.log(`Wrote ${path.join(outDir, 'balance-report.md')}`);
   console.log(`Wrote ${path.join(outDir, 'latest.json')}`);
   if (pageErrors.length) {
     console.error('Page errors:', pageErrors);
