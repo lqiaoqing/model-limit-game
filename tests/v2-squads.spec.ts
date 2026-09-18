@@ -84,10 +84,14 @@ test.describe('v2 tactical squads', () => {
     await boot(page, 42);
     let rush: Ticket[] = [];
     let nest: Ticket[] = [];
-    for (let seed = 1; seed <= 60 && (rush.length === 0 || nest.length === 0); seed += 1) {
-      const enc = await compose(page, 10, seed);
-      if (rush.length === 0) rush = findSquad(enc.tickets, 'bomb_rush');
-      if (nest.length === 0) nest = findSquad(enc.tickets, 'artillery_nest');
+    for (let seed = 1; seed <= 80 && (rush.length === 0 || nest.length === 0); seed += 1) {
+      // Non-boss waves give fuller threat budgets so artillery/bomb recipes can roll.
+      for (const wave of [7, 8, 9, 10, 11, 12, 13, 14]) {
+        const enc = await compose(page, wave, seed);
+        if (rush.length === 0) rush = findSquad(enc.tickets, 'bomb_rush');
+        if (nest.length === 0) nest = findSquad(enc.tickets, 'artillery_nest');
+        if (rush.length > 0 && nest.length > 0) break;
+      }
     }
     expect(rush.length, 'bomb_rush at wave 4+').toBeGreaterThan(0);
     expect(rush.some((t) => t.kind === 'bomber')).toBe(true);

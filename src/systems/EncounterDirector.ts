@@ -1,6 +1,7 @@
 import type { EnemyKind } from '../entities/Enemy';
 import { ENEMY_ARCHETYPES, isUnlocked } from './EnemyArchetypes';
 import { bossIdForWave } from './BossDefinitions';
+import { pickFillerKind } from './WaveProgression';
 
 export type SquadRecipeId =
   | 'hunter_pack'
@@ -102,7 +103,22 @@ export const SQUAD_RECIPES: SquadRecipe[] = [
 
 export function threatBudgetForWave(wave: number, stressMode: boolean): number {
   if (stressMode) return 0;
-  return 8 + wave * 3;
+  // Designed first cycle: gentle teaches → denser mid → heavy push, no HP sponge math.
+  if (wave <= 4) return 7 + wave * 2;
+  if (wave === 5) return Math.max(10, Math.floor((8 + wave * 3) * 0.55));
+  if (wave <= 9) return 12 + (wave - 5) * 3;
+  if (wave === 10) return Math.max(12, Math.floor((8 + wave * 3) * 0.55));
+  if (wave <= 14) return 16 + (wave - 10) * 2.5;
+  return Math.max(14, Math.floor((8 + wave * 3) * 0.55));
+}
+
+/** Squad recipes available at this wave (unlock gate + at least one unlocked mix kind). */
+export function unlockedSquadRecipes(wave: number): SquadRecipe[] {
+  return SQUAD_RECIPES.filter((recipe) => {
+    if (wave < recipe.unlockWave) return false;
+    const kinds = Object.keys(recipe.mix) as EnemyKind[];
+    return kinds.some((k) => isUnlocked(k, wave) || k === 'boss');
+  });
 }
 
 function anchorWorld(
@@ -224,7 +240,7 @@ export function composeWaveTickets(options: {
   let budget = threatBudgetForWave(wave, false);
   if (bossWave) budget = Math.max(10, Math.floor(budget * 0.55));
 
-  const unlocked = SQUAD_RECIPES.filter((recipe) => wave >= recipe.unlockWave);
+  const unlocked = unlockedSquadRecipes(wave);
 
   const tickets: SpawnTicket[] = [];
   const squads: SquadRecipeId[] = [];
@@ -257,7 +273,15 @@ export function composeWaveTickets(options: {
 
     const members: EnemyKind[] = [];
     for (const [kind, count] of Object.entries(pick.mix)) {
-      for (let i = 0; i < (count ?? 0); i += 1) members.push(kind as EnemyKind);
+      const k = kind as EnemyKind;
+      if (!isUnlocked(k, wave) && k !== 'boss') continue;
+      for (let i = 0; i < (count ?? 0); i += 1) members.push(k);
+    }
+    // Fallback: if a recipe's mix was fully filtered, skip rather than spawn locked kinds.
+    if (members.length === 0) {
+      budget += pick.threat;
+      squads.pop();
+      continue;
     }
 
     members.forEach((kind, index) => {
@@ -281,15 +305,7 @@ export function composeWaveTickets(options: {
     : 2 + Math.min(14, Math.floor(wave * 1.1));
   for (let i = 0; i < fillerBase; i += 1) {
     const r = rng();
-    let kind: EnemyKind = 'chaser';
-    // Weighted filler among unlocked normal archetypes.
-    const unlockedKinds = (
-      ['chaser', 'ranged', 'swarm', 'elite', 'bomber', 'bulwark', 'sniper', 'disruptor'] as const
-    ).filter((k) => isUnlocked(k, wave));
-    if (unlockedKinds.length > 0) {
-      const idx = Math.floor(r * unlockedKinds.length) % unlockedKinds.length;
-      kind = unlockedKinds[idx];
-    }
+    const kind = pickFillerKind(wave, r);
     const anchor: SpawnAnchor = (['north', 'south', 'east', 'west'] as const)[
       Math.floor(r * 4) % 4
     ];

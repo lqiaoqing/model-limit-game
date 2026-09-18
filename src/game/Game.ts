@@ -33,6 +33,7 @@ import {
 import { enemyFormTierForWave } from '../systems/EnemyAssets';
 import { createSeededRandom } from '../utils/random';
 import { composeWaveTickets } from '../systems/EncounterDirector';
+import { auditWaveTickets, fullCyclePlan, wavePlan } from '../systems/WaveProgression';
 import { WEAPON_DEFS, weaponAt, type WeaponId } from '../combat/Weapons';
 import { createCombatModifiers, EMERGENCY_HP_RATIO, EMERGENCY_SHIELD, HAZARD_BUFF_WINDOW, modifierIds, PLASMA_FEEDBACK_HEAT_REFUND, resetCombatModifiers, type CombatModifiers } from '../combat/CombatModifiers';
 import { createCombatBuild, resetCombatBuild, resolveWeaponStats } from '../combat/CombatBuild';
@@ -2170,6 +2171,20 @@ export class Game {
           halfWidth: 14,
           halfDepth: 9,
         });
+      },
+      getWavePlan: (wave: number) => wavePlan(wave),
+      getFullCyclePlan: () => fullCyclePlan(),
+      auditWave: (wave: number, seed: number) => {
+        const rng = createSeededRandom(seed);
+        const enc = composeWaveTickets({
+          wave,
+          stressMode: false,
+          rng,
+          bossWave: wave % 5 === 0,
+          halfWidth: 14,
+          halfDepth: 9,
+        });
+        return auditWaveTickets(wave, enc.tickets, enc.squads);
       },
       getEncounterSnapshot: () => ({
         wave: this.waves.wave,

@@ -64,6 +64,43 @@ declare global {
         squads: string[];
         budgetLeft: number;
       };
+      getWavePlan?: (wave: number) => {
+        wave: number;
+        band: string;
+        bossId: string | null;
+        unlockedKinds: string[];
+        hazardBudget: number;
+        squadFloor: number;
+        blurb: string;
+      };
+      getFullCyclePlan?: () => Array<{
+        wave: number;
+        band: string;
+        bossId: string | null;
+        unlockedKinds: string[];
+        hazardBudget: number;
+        squadFloor: number;
+        blurb: string;
+      }>;
+      auditWave?: (
+        wave: number,
+        seed: number,
+      ) => {
+        wave: number;
+        plan: {
+          wave: number;
+          band: string;
+          bossId: string | null;
+          unlockedKinds: string[];
+          hazardBudget: number;
+          squadFloor: number;
+          blurb: string;
+        };
+        ticketKinds: string[];
+        squadIds: string[];
+        bossId: string | null;
+        violations: string[];
+      };
       getEncounterSnapshot?: () => {
         wave: number;
         squads: string[];
