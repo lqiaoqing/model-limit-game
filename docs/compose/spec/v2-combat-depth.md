@@ -16,9 +16,11 @@ commits: 909fb64..HEAD
 
 **Verification** —
 - `npm run build` PASS
-- Playwright `desktop-chrome` **43/43 PASS** (bot, combat, content, upgrades, enemies, squads, hazards, bosses, progress, telemetry, visual)
-- `npm run balance:full` PASS — 20 runs (5 seeds × 4 weapons); mean DPS 7.53; frameMs p50 ≈ 16.7–20
-- Arena eval + compare refreshed under `arena/runs/` (evidence only; not used to retune gameplay)
+- Playwright `desktop-chrome` full V2 regression PASS (bot, combat, content, upgrades, enemies, squads, hazards, bosses, progress, telemetry, visual)
+- `npm run balance:full` PASS — **20 runs** (5 seeds × 4 weapons); **mean DPS 7.19**; frameMs p50 ≈ 18, p95 ≈ 19.5, p99 ≈ 27–37
+- Weapon DPS (full run, current HEAD): plasma 7.82 · rail 4.95 (`weak?`) · scatter 7.22 · launcher 8.76 (`OP?` heuristic only — not a gameplay retune)
+- Canonical artifacts: `artifacts/balance/full/`; smoke isolated under `artifacts/balance/smoke/`
+- Arena eval `current-v2`: Build PASS · Bot PASS · Balance **SKIPPED** (full evidence lives in balance:full); total **93.8/100** — evidence only, not used to retune gameplay
 
 **Journey log** —
 1. `captureWeaponBonuses` reverse-engineering leaked weapon-affinity damage; replaced by explicit CombatBuild.
@@ -101,14 +103,17 @@ Weapon chips on HUD; diagnostics `weapon` / `modifiers` / `bossPhase` / weapon n
 
 New modules only: `src/combat/Weapons.ts`, `src/combat/CombatModifiers.ts`, `src/systems/EncounterDirector.ts`, `src/systems/BossPhases.ts`. `Game.ts` remains orchestrator.
 
-## [S3] Out of Scope
+## [S3] Out of Scope (still true for V2 Beta)
 
-- WebGPU / dual renderer backends
+- WebGPU compute / dual-renderer productionization
 - 500+ enemies, Apocalypse mode
-- 4th weapon, 8 enemy archetypes, 3 bosses, arena hazards
-- Full automated balance harness / multi-seed win-rate report
-- Deterministic replay, model-vs-model leaderboard
-- Online multiplayer, accounts, narrative content
+- Full automated multi-model runner / online multiplayer
+- Deterministic replay system
+- Narrative content, accounts
+
+**Not out of scope anymore (already in this beta):** 4th weapon (Ion Launcher), 8 normal archetypes, 3 bosses, arena hazards, balance harness, telemetry breakdowns, Playwright V2 suite.
+
+V2.5 and V3 remain **prototype**.
 
 ## Tasks
 
