@@ -102,8 +102,7 @@ export function classifyDamageSource(source: string | null): 'weapon' | 'upgrade
     source === 'shield_nova' ||
     source === 'plasma_feedback' ||
     source === 'rail_ricochet' ||
-    source === 'scatter_shrapnel' ||
-    source.startsWith('ion_')
+    source === 'scatter_shrapnel'
   ) {
     return 'upgrade';
   }

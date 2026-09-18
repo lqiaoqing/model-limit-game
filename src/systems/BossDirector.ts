@@ -15,6 +15,7 @@ import {
 } from './BossDefinitions';
 
 export type BossDirectorDeps = {
+  scene: THREE.Scene;
   waves: WaveDirector;
   projectiles: ProjectilePool;
   player: Player;
@@ -30,12 +31,68 @@ const BEAM_HALF_WIDTH = 0.55;
 export class BossDirector {
   state: BossDirectorState = createBossDirectorState();
   private lastBossRef: Enemy | null = null;
+  /** Visual beam handles for orbital warden (telegraphed rotating lines). */
+  private beamVisuals: THREE.Mesh[] = [];
+  private beamGeo: THREE.PlaneGeometry | null = null;
+  private beamMat: THREE.MeshBasicMaterial | null = null;
+  private beamWarn = 0;
 
   constructor(private readonly deps: BossDirectorDeps) {}
 
   reset(): void {
+    this.clearBeams();
     this.state = createBossDirectorState();
     this.lastBossRef = null;
+  }
+
+  private clearBeams(): void {
+    for (const m of this.beamVisuals) {
+      m.parent?.remove(m);
+      m.geometry.dispose();
+    }
+    this.beamVisuals = [];
+    this.beamGeo?.dispose();
+    this.beamMat?.dispose();
+    this.beamGeo = null;
+    this.beamMat = null;
+  }
+
+  private ensureBeamVisuals(scene: THREE.Scene, count: number, color: string): void {
+    if (this.beamVisuals.length === count && this.beamMat) {
+      this.beamMat.color.set(color);
+      return;
+    }
+    this.clearBeams();
+    const len = BEAM_LENGTH;
+    this.beamGeo = new THREE.PlaneGeometry(len, BEAM_HALF_WIDTH * 2);
+    this.beamMat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    for (let i = 0; i < count; i += 1) {
+      const mesh = new THREE.Mesh(this.beamGeo, this.beamMat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = 0.12;
+      scene.add(mesh);
+      this.beamVisuals.push(mesh);
+    }
+  }
+
+  private syncBeamVisuals(scene: THREE.Scene, boss: Enemy, beams: number, color: string, angle: number): void {
+    this.ensureBeamVisuals(scene, beams, color);
+    const ox = boss.group.position.x;
+    const oz = boss.group.position.z;
+    for (let b = 0; b < beams; b += 1) {
+      const ang = angle + (b / beams) * Math.PI;
+      const mesh = this.beamVisuals[b];
+      if (!mesh) continue;
+      mesh.position.set(ox + (Math.cos(ang) * BEAM_LENGTH) / 2, 0.12, oz + (Math.sin(ang) * BEAM_LENGTH) / 2);
+      mesh.rotation.z = -ang;
+      if (this.beamMat) this.beamMat.opacity = this.beamWarn > 0 ? 0.2 : 0.45;
+    }
   }
 
   setBoss(bossId: BossId | null): void {
@@ -70,6 +127,7 @@ export class BossDirector {
         // P2 shield until drones die; P3 shield off with dual beams.
         this.state.shieldActive = nextPhase === 2;
         this.state.shieldDrones = nextPhase === 2 ? 3 : 0;
+        this.beamWarn = 1.0;
       }
       if (id === 'void_engine') {
         this.state.arenaShrink = phase.arenaShrink ? 0.72 : 1;
@@ -100,6 +158,7 @@ export class BossDirector {
       this.state.bossId = id;
       this.state.shieldActive = id === 'orbital_warden';
       this.state.shieldDrones = id === 'orbital_warden' ? 2 : 0;
+      this.beamWarn = 1.1;
       this.lastBossRef = boss;
     }
 
@@ -161,27 +220,38 @@ export class BossDirector {
       this.state.spiralAngle += id === 'void_engine' ? 0.5 : 0.35;
     }
 
-    // Rotating beam(s) — orbital warden identity.
+    // Rotating beam(s) — orbital warden identity (visual telegraph + short warn window).
     if (def.mechanics.rotatingBeam) {
       const beams = phase.beamCount ?? 1;
       const spin = phase.beamSpin ?? 0.8;
+      this.beamWarn = Math.max(0, this.beamWarn - delta);
       this.state.beamAngle += spin * delta;
-      this.state.beamTimer = 0.4; // continuous while active
-      for (let b = 0; b < beams; b += 1) {
-        const ang = this.state.beamAngle + (b / beams) * Math.PI;
-        this.applyBeamDamage(boss, ang, phase);
+      this.state.beamTimer = 0.4;
+      this.syncBeamVisuals(this.deps.scene, boss, beams, phase.color, this.state.beamAngle);
+      // Only deal beam damage after a brief warn flash so it is never silent.
+      if (this.beamWarn <= 0) {
+        for (let b = 0; b < beams; b += 1) {
+          const ang = this.state.beamAngle + (b / beams) * Math.PI;
+          this.applyBeamDamage(boss, ang, phase);
+        }
       }
+    } else {
+      this.clearBeams();
     }
 
-    // Teleport — void engine.
+    // Teleport — void engine (telegraph flash, then blink).
     if (def.mechanics.teleport && phase.teleportEvery) {
       this.state.teleportTimer -= delta;
+      if (this.state.teleportTimer <= phase.teleportEvery * 0.25 && this.state.teleportTimer > 0) {
+        boss.telegraphTimer = Math.max(boss.telegraphTimer, 0.2);
+      }
       if (this.state.teleportTimer <= 0) {
         this.state.teleportTimer = phase.teleportEvery;
+        this.beamWarn = 0; // unused for void
         const hw = 12;
         const hd = 7.5;
-        const x = (rng() - 0.5) * hw * 1.4;
-        const z = (rng() - 0.5) * hd * 1.4;
+        const x = (this.deps.rng() - 0.5) * hw * 1.4;
+        const z = (this.deps.rng() - 0.5) * hd * 1.4;
         boss.group.position.x = THREE.MathUtils.clamp(x, -hw, hw);
         boss.group.position.z = THREE.MathUtils.clamp(z, -hd, hd);
         projectiles.spawn(

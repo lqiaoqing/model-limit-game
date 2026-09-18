@@ -60,7 +60,7 @@ export type CombatDeps = {
   getWeapon: () => WeaponId;
   rng: () => number;
   onEnemyKilled: (enemy: Enemy, source?: { sourceWeapon: string | null; damage: number }) => void;
-  onPlayerProjectileHit: () => void;
+  onPlayerProjectileHit: (amount?: number) => void;
   onDamageDealt?: (amount: number, weapon: string | null) => void;
   onShot?: (count: number, weapon: string) => void;
   /** Debug: player damage multiplier. */
@@ -236,9 +236,9 @@ export class CombatSystem {
       if (enemy.stats.kind === 'boss') {
         dmg *= this.deps.getBossDamageMul?.() ?? 1;
       }
-      const died = enemy.takeDamage(dmg);
+      const died = enemy.takeDamage(dmg, pos);
       totalDamage += dmg;
-      onDamageDealt?.(dmg, 'ion_impact');
+      onDamageDealt?.(dmg, 'launcher');
       vfx.spawnBurst(enemy.group.position.clone().setY(0.4), '#4ade80', 7, 4.5);
       if (!died) {
         enemy.staggerTimer = Math.max(enemy.staggerTimer, 0.2);
@@ -255,8 +255,6 @@ export class CombatSystem {
     if (refund > 0) {
       this.deps.player.coolHeat(refund);
     }
-    // Attribute core explosion damage to ion weapon identity for weapon buckets.
-    if (totalDamage > 0) onDamageDealt?.(0, 'launcher');
     return totalDamage;
   }
 
@@ -408,7 +406,7 @@ export class CombatSystem {
         if (dx * dx + dz * dz <= rr * rr) {
           const hurt = player.takeDamage(p.damage);
           if (hurt.hit) {
-            this.deps.onPlayerProjectileHit();
+            this.deps.onPlayerProjectileHit(p.damage);
             if (hurt.shieldBroke) this.maybeShieldNova();
           }
           p.deactivate();

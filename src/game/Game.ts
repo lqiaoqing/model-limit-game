@@ -227,8 +227,9 @@ export class Game {
       getWeapon: () => this.weapon,
       rng: () => this.rng(),
       onEnemyKilled: (enemy, source) => this.onEnemyKilled(enemy, source),
-      onPlayerProjectileHit: () => {
+      onPlayerProjectileHit: (amount?: number) => {
         this.lastDeathCause = 'projectile';
+        this.recordPlayerTaken(amount ?? 10, 'projectile');
         this.onPlayerHurt();
       },
       onDamageDealt: (amount, weapon) => this.recordDamage(amount, weapon),
@@ -240,6 +241,7 @@ export class Game {
     });
 
     this.bossDirector = new BossDirector({
+      scene: this.scene,
       waves: this.waves,
       projectiles: this.projectiles,
       player: this.player,
@@ -976,7 +978,7 @@ export class Game {
 
   private recordDamage(amount: number, weapon: string | null): void {
     this.damageDealt += amount;
-    this.hitsLanded += 1;
+    if (amount > 0) this.hitsLanded += 1;
     if (weapon) this.damageByWeapon[weapon] = (this.damageByWeapon[weapon] ?? 0) + amount;
     const bucket = classifyDamageSource(weapon);
     this.telemetry.recordDamage(amount, weapon, bucket);
@@ -1093,8 +1095,14 @@ export class Game {
     if (shrink < 1) {
       const hw = ARENA.halfWidth * shrink;
       const hd = ARENA.halfDepth * shrink;
-      this.player.group.position.x = THREE.MathUtils.clamp(this.player.group.position.x, -hw, hw);
-      this.player.group.position.z = THREE.MathUtils.clamp(this.player.group.position.z, -hd, hd);
+      // Soft-safe boundary telegraph via world pulse when player presses the wall.
+      const px = this.player.group.position.x;
+      const pz = this.player.group.position.z;
+      if (Math.abs(px) > hw - 0.2 || Math.abs(pz) > hd - 0.2) {
+        this.worldFx.triggerPulse(this.player.group.position, '#a78bfa', 3.5);
+      }
+      this.player.group.position.x = THREE.MathUtils.clamp(px, -hw, hw);
+      this.player.group.position.z = THREE.MathUtils.clamp(pz, -hd, hd);
     }
   }
 
@@ -1113,7 +1121,7 @@ export class Game {
       const dz = enemy.group.position.z - this.player.group.position.z;
       if (dx * dx + dz * dz <= radius * radius) {
         enemy.hitFlash();
-        const died = enemy.takeDamage(this.player.stats.ultDamage);
+        const died = enemy.takeDamage(this.player.stats.ultDamage, this.player.group.position);
         if (died) this.onEnemyKilled(enemy);
       }
     }
