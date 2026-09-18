@@ -35,6 +35,8 @@ declare global {
         modifiers: string[];
         stacks: Record<string, number>;
         perWeaponDamage?: Record<string, number>;
+        poolSize?: number;
+        ruleCount?: number;
       };
     };
     __THREE_GAME_DIAGNOSTICS__?: {

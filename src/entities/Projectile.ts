@@ -69,6 +69,8 @@ export class Projectile {
   sourceWeapon: string | null = null;
   /** Radial blast on impact; 0 = no explosion. */
   aoeRadius = 0;
+  /** Rail ricochet already used for this shot. */
+  ricocheted = false;
   /** Targets already damaged by this projectile (prevents pierce re-hits). */
   readonly hitSet = new Set<string>();
   /** How many targets this projectile has already damaged. */
@@ -133,6 +135,7 @@ export class Projectile {
     this.crit = extras?.crit ?? false;
     this.sourceWeapon = weapon ?? null;
     this.aoeRadius = extras?.aoeRadius ?? 0;
+    this.ricocheted = false;
     this.hitSet.clear();
     this.hitsLanded = 0;
     this.group.visible = true;

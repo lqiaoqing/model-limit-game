@@ -20,7 +20,21 @@ export type UpgradeId =
   | 'rail_reactor'
   | 'scatter_choke'
   | 'dash_detonation'
-  | 'shield_nova';
+  | 'shield_nova'
+  | 'plasma_feedback'
+  | 'plasma_superconduct'
+  | 'rail_execute'
+  | 'rail_ricochet'
+  | 'rail_charge'
+  | 'scatter_shrapnel'
+  | 'scatter_breach'
+  | 'scatter_dash_reload'
+  | 'ion_expansion'
+  | 'ion_aftershock'
+  | 'ion_heat_sink'
+  | 'emergency_protocol'
+  | 'momentum_core'
+  | 'hazard_conductor';
 
 export type UpgradeApplyCtx = {
   stats: PlayerStats;
@@ -33,6 +47,8 @@ export type UpgradeDef = {
   color: string;
   maxStacks: number;
   weaponAffinity?: WeaponId;
+  /** Rule-changing modules alter combat identity, not just numbers. */
+  rule?: boolean;
   apply: (ctx: UpgradeApplyCtx) => void;
 };
 
@@ -107,6 +123,7 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     color: '#38bdf8',
     maxStacks: 2,
     weaponAffinity: 'plasma',
+    rule: true,
     apply: ({ mods }) => {
       mods.arcChain += 1;
     },
@@ -116,6 +133,7 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     color: '#f97316',
     maxStacks: 1,
     weaponAffinity: 'plasma',
+    rule: true,
     apply: ({ mods }) => {
       mods.overheatEmp = true;
     },
@@ -125,6 +143,7 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     color: '#e879f9',
     maxStacks: 1,
     weaponAffinity: 'plasma',
+    rule: true,
     apply: ({ mods }) => {
       mods.critConductor = true;
     },
@@ -134,6 +153,7 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     color: '#fbbf24',
     maxStacks: 2,
     weaponAffinity: 'rail',
+    rule: true,
     apply: ({ build }) => {
       build.modifiers.railPierce += 1;
       build.perWeapon.rail.dmgBonus += 2;
@@ -144,6 +164,7 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     color: '#f59e0b',
     maxStacks: 1,
     weaponAffinity: 'rail',
+    rule: true,
     apply: ({ mods }) => {
       mods.railHeatRefund = true;
     },
@@ -153,6 +174,7 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     color: '#f472b6',
     maxStacks: 2,
     weaponAffinity: 'scatter',
+    rule: true,
     apply: ({ build }) => {
       build.modifiers.scatterCloseBonus = true;
       build.perWeapon.scatter.dmgBonus += 1;
@@ -164,6 +186,7 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     color: '#22d3ee',
     maxStacks: 1,
     weaponAffinity: 'scatter',
+    rule: true,
     apply: ({ mods }) => {
       mods.dashDetonation = true;
     },
@@ -172,11 +195,163 @@ export const UPGRADE_POOL: UpgradeDef[] = [
     id: 'shield_nova',
     color: '#3ec6ff',
     maxStacks: 1,
+    rule: true,
     apply: ({ mods }) => {
       mods.shieldNova = true;
     },
   },
+  {
+    id: 'plasma_feedback',
+    color: '#67e8f9',
+    maxStacks: 1,
+    weaponAffinity: 'plasma',
+    rule: true,
+    apply: ({ mods }) => {
+      mods.plasmaFeedback = true;
+    },
+  },
+  {
+    id: 'plasma_superconduct',
+    color: '#7dd3fc',
+    maxStacks: 1,
+    weaponAffinity: 'plasma',
+    rule: true,
+    apply: ({ mods }) => {
+      mods.plasmaSuperconduct = true;
+    },
+  },
+  {
+    id: 'rail_execute',
+    color: '#fde68a',
+    maxStacks: 2,
+    weaponAffinity: 'rail',
+    rule: true,
+    apply: ({ build }) => {
+      build.modifiers.railExecute = true;
+      build.perWeapon.rail.dmgBonus += 1;
+    },
+  },
+  {
+    id: 'rail_ricochet',
+    color: '#fcd34d',
+    maxStacks: 1,
+    weaponAffinity: 'rail',
+    rule: true,
+    apply: ({ mods }) => {
+      mods.railRicochet = true;
+    },
+  },
+  {
+    id: 'rail_charge',
+    color: '#fb923c',
+    maxStacks: 1,
+    weaponAffinity: 'rail',
+    rule: true,
+    apply: ({ mods }) => {
+      mods.railCharge = true;
+    },
+  },
+  {
+    id: 'scatter_shrapnel',
+    color: '#f9a8d4',
+    maxStacks: 2,
+    weaponAffinity: 'scatter',
+    rule: true,
+    apply: ({ build }) => {
+      build.modifiers.scatterShrapnel = true;
+      build.perWeapon.scatter.dmgBonus += 0;
+    },
+  },
+  {
+    id: 'scatter_breach',
+    color: '#f472b6',
+    maxStacks: 2,
+    weaponAffinity: 'scatter',
+    rule: true,
+    apply: ({ build }) => {
+      build.modifiers.scatterBreach = true;
+      build.perWeapon.scatter.dmgBonus += 1;
+    },
+  },
+  {
+    id: 'scatter_dash_reload',
+    color: '#fbcfe8',
+    maxStacks: 1,
+    weaponAffinity: 'scatter',
+    rule: true,
+    apply: ({ mods }) => {
+      mods.scatterDashReload = true;
+    },
+  },
+  {
+    id: 'ion_expansion',
+    color: '#86efac',
+    maxStacks: 2,
+    weaponAffinity: 'launcher',
+    rule: true,
+    apply: ({ build }) => {
+      build.modifiers.ionBlastRadiusMul *= 1.22;
+      build.perWeapon.launcher.dmgBonus = Math.round(build.perWeapon.launcher.dmgBonus - 3);
+    },
+  },
+  {
+    id: 'ion_aftershock',
+    color: '#4ade80',
+    maxStacks: 1,
+    weaponAffinity: 'launcher',
+    rule: true,
+    apply: ({ mods }) => {
+      mods.ionAftershock = true;
+    },
+  },
+  {
+    id: 'ion_heat_sink',
+    color: '#bbf7d0',
+    maxStacks: 2,
+    weaponAffinity: 'launcher',
+    rule: true,
+    apply: ({ mods }) => {
+      mods.ionHeatRefundPerHit += 1.2;
+    },
+  },
+  {
+    id: 'emergency_protocol',
+    color: '#f87171',
+    maxStacks: 1,
+    rule: true,
+    apply: ({ mods }) => {
+      mods.emergencyProtocol = true;
+    },
+  },
+  {
+    id: 'momentum_core',
+    color: '#a5b4fc',
+    maxStacks: 3,
+    rule: true,
+    apply: ({ mods }) => {
+      mods.momentumCore += 1;
+    },
+  },
+  {
+    id: 'hazard_conductor',
+    color: '#fbbf24',
+    maxStacks: 1,
+    rule: true,
+    apply: ({ mods }) => {
+      mods.hazardConductor = true;
+    },
+  },
 ];
+
+export const RULE_UPGRADE_IDS: UpgradeId[] = UPGRADE_POOL.filter((u) => u.rule).map((u) => u.id);
+
+export function countUpgrades(): number {
+  return UPGRADE_POOL.length;
+}
+
+export function countRuleUpgrades(): number {
+  return RULE_UPGRADE_IDS.length;
+}
 
 export type UpgradeOffer = {
   id: UpgradeId;

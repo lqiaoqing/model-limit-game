@@ -20,6 +20,8 @@ import { DebugTools, createDebugFlags, type DebugFlags, type DebugTuning } from 
 import { EnemyBatchRenderer } from '../systems/EnemyBatchRenderer';
 import { disposeEnemyAssets } from '../systems/EnemyAssets';
 import {
+  countRuleUpgrades,
+  countUpgrades,
   getUpgrade,
   rollUpgradeOffers,
   UPGRADE_POOL,
@@ -29,7 +31,7 @@ import {
 import { enemyFormTierForWave } from '../systems/EnemyAssets';
 import { createSeededRandom } from '../utils/random';
 import { WEAPON_DEFS, weaponAt, type WeaponId } from '../combat/Weapons';
-import { createCombatModifiers, modifierIds, resetCombatModifiers, type CombatModifiers } from '../combat/CombatModifiers';
+import { createCombatModifiers, EMERGENCY_HP_RATIO, EMERGENCY_SHIELD, modifierIds, PLASMA_FEEDBACK_HEAT_REFUND, resetCombatModifiers, type CombatModifiers } from '../combat/CombatModifiers';
 import { createCombatBuild, resetCombatBuild, resolveWeaponStats } from '../combat/CombatBuild';
 import { CombatSystem } from '../combat/CombatSystem';
 import {
@@ -133,6 +135,7 @@ export class Game {
   private pausedForScreenshot = false;
   private reducedMotion = false;
   private lastWaveShown = 0;
+  private emergencyUsed = false;
   private lastEnemyFormTier = 0;
   private fpsAccum = 0;
   private fpsFrames = 0;
@@ -449,9 +452,15 @@ export class Game {
       this.feel.triggerFovPunch(2);
     }
 
-    if (dashStarted && this.combatMods.dashDetonation) {
-      this.combat.queueDashBlast(this.player.group.position);
+    if (dashStarted) {
+      this.combat.notifyDash();
+      if (this.combatMods.dashDetonation) this.combat.queueDashBlast(this.player.group.position);
     }
+
+    const moveLen = this.inputFrame.move.length();
+    this.combat.tickRuleRuntime(delta, moveLen > 0.08);
+    this.player.fireIntervalMul = this.combat.getFireIntervalMul();
+    this.player.moveSpeedMul = this.combat.getMoveSpeedMul();
 
     if (this.player.overheatPulse) {
       this.combat.castOverheatEmp();
@@ -514,6 +523,7 @@ export class Game {
         this.vfx.spawnShockwave(this.player.group.position, '#7ae7ff', 5);
       }
       if (!this.stressMode && prev >= 1) {
+        this.emergencyUsed = false;
         this.openUpgrade();
         return;
       }
@@ -735,6 +745,9 @@ export class Game {
 
     if (this.combatMods.arcChain > 0 && kind !== 'boss') {
       this.combat.spawnArcChains(enemy.group.position, this.combatMods.arcChain);
+      if (this.combatMods.plasmaFeedback && this.rng() < 0.35) {
+        this.player.coolHeat(PLASMA_FEEDBACK_HEAT_REFUND);
+      }
     }
 
     const pos = enemy.group.position;
@@ -792,6 +805,7 @@ export class Game {
     this.feel.triggerFovPunch(3);
     this.vfx.addTrauma(0.45);
     this.vfx.spawnBurst(this.player.group.position.clone().setY(0.7), '#ff4d6d', 10, 6);
+    this.maybeEmergencyProtocol();
     if (!this.player.alive) {
       if (this.debugFlags.godMode) {
         this.reviveGodMode();
@@ -802,6 +816,19 @@ export class Game {
       this.vfx.spawnShockwave(this.player.group.position, '#ff4d6d', 10);
       this.feel.triggerHitstop(0.18);
     }
+  }
+
+  private maybeEmergencyProtocol(): void {
+    if (!this.combatMods.emergencyProtocol || this.emergencyUsed) return;
+    if (!this.player.alive) return;
+    const ratio = this.player.hp / Math.max(1, this.player.stats.maxHp);
+    if (ratio > EMERGENCY_HP_RATIO) return;
+    this.emergencyUsed = true;
+    this.player.addShield(EMERGENCY_SHIELD);
+    this.player.dashCooldown = 0;
+    this.hud.pushKillFeed(t().upgrades.emergency_protocol.name, 'boss');
+    this.hud.flashPickup(t().upgrades.emergency_protocol.name, '#f87171');
+    this.vfx.spawnShockwave(this.player.group.position, '#f87171', 4.5);
   }
 
   private recordShots(count: number, weapon: string): void {
@@ -848,6 +875,7 @@ export class Game {
     this.player.stats.heatPerShot = resolved.heatPerShot;
     this.player.stats.projectileSpeed = resolved.projectileSpeed;
     this.player.stats.projectileDamage = resolved.damage;
+    this.player.fireIntervalMul = this.combat.getFireIntervalMul();
   }
 
   private updateBossPhase(enemy: Enemy): void {
@@ -1115,6 +1143,7 @@ export class Game {
     this.bossRuntime = createBossRuntime();
     this.lastBossRef = null;
     this.combat.reset();
+    this.emergencyUsed = false;
     this.hud.hideUpgradeCards();
     this.hud.setActiveWeapon('plasma');
     this.feel.reset();
@@ -1958,6 +1987,8 @@ export class Game {
           modifiers: modifierIds(this.combatMods),
           stacks: { ...this.upgradeStacks },
           perWeaponDamage,
+          poolSize: countUpgrades(),
+          ruleCount: countRuleUpgrades(),
         };
       },
     };

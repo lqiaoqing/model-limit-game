@@ -584,7 +584,7 @@ export class Player {
     }
 
     const speed =
-      this.dashTimer > 0 ? this.stats.dashSpeed * this.dashSpeedMul : this.stats.moveSpeed;
+      this.dashTimer > 0 ? this.stats.dashSpeed * this.dashSpeedMul : this.stats.moveSpeed * this.moveSpeedMul;
     if (this.dashTimer > 0) this.dashTimer = Math.max(0, this.dashTimer - delta);
 
     const target = new THREE.Vector3(move.x, 0, move.y).multiplyScalar(speed);
@@ -648,7 +648,7 @@ export class Player {
     );
 
     if (fireHeld && !this.overheated && this.fireCooldown <= 0) {
-      this.fireCooldown = this.stats.fireInterval;
+      this.fireCooldown = this.stats.fireInterval * this.fireIntervalMul;
       this.heat += this.stats.heatPerShot;
       this.recoil = 1;
       if (this.heat >= this.stats.maxHeat) {
@@ -689,6 +689,10 @@ export class Player {
     this.heat = Math.max(0, this.heat - amount);
     if (this.heat < this.stats.maxHeat * 0.35) this.overheated = false;
   }
+
+  /** Temporary combat-rule multipliers (dash reload / momentum). */
+  fireIntervalMul = 1;
+  moveSpeedMul = 1;
 
   takeDamage(amount: number): { hit: boolean; shieldBroke: boolean } {
     if (!this.alive || this.invulnTimer > 0) return { hit: false, shieldBroke: false };
