@@ -199,6 +199,19 @@ export class Enemy {
   wantDisruptPulse = false;
   /** Sniper laser lock remaining (readable telegraph). */
   lockTimer = 0;
+  /** Tactical squad bookkeeping (not a unique global logic id). */
+  squadId: string | null = null;
+  squadRole: string | null = null;
+  squadAnchor: string | null = null;
+  /** Written each frame by SquadController. */
+  squadSteer = {
+    preferredDist: null as number | null,
+    flankSign: 0,
+    holdTimer: 0,
+    cohesionX: null as number | null,
+    cohesionZ: null as number | null,
+    role: null as string | null,
+  };
 
   private bossVisual: THREE.Group | null = null;
   private bossRings: THREE.Mesh[] = [];
@@ -318,6 +331,35 @@ export class Enemy {
     let moveDir = toPlayer.clone();
     let speed = this.stats.speed * this.moveSpeedMul;
     this.wantDisruptPulse = false;
+
+    // Squad tactical biases (preferred range / flank / group timing / cohesion).
+    const steer = this.squadSteer;
+    if (steer.holdTimer > 0) {
+      steer.holdTimer = Math.max(0, steer.holdTimer - delta);
+      speed *= 0.12;
+    }
+    if (steer.preferredDist != null && this.stats.kind !== 'bomber') {
+      const pref = steer.preferredDist;
+      if (dist < pref - 0.9) moveDir.multiplyScalar(-1);
+      else if (Math.abs(dist - pref) < 1.1) {
+        moveDir.set(-toPlayer.z, 0, toPlayer.x).multiplyScalar(0.55);
+        speed *= 0.75;
+      }
+    }
+    if (steer.flankSign !== 0) {
+      const perp = new THREE.Vector3(-toPlayer.z, 0, toPlayer.x).multiplyScalar(steer.flankSign * 0.5);
+      moveDir.add(perp);
+    }
+    if (steer.cohesionX != null && steer.cohesionZ != null) {
+      const toPack = new THREE.Vector3(
+        steer.cohesionX - this.group.position.x,
+        0,
+        steer.cohesionZ - this.group.position.z,
+      );
+      const packLen = toPack.length();
+      if (packLen > 2.2) moveDir.add(toPack.normalize().multiplyScalar(0.35));
+    }
+    if (moveDir.lengthSq() > 1e-6) moveDir.normalize();
 
     if (this.stats.kind === 'ranged' || this.stats.kind === 'disruptor') {
       const preferred = this.stats.kind === 'disruptor' ? 5.5 : 6.5;

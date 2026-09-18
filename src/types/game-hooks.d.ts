@@ -25,6 +25,51 @@ declare global {
         alive: boolean;
       }>;
       clearEnemies?: () => { ok: boolean; enemies: number };
+      forceWave?: (wave: number) => { wave: number; squads: string[] };
+      composeEncounter?: (
+        wave: number,
+        seed: number,
+      ) => {
+        tickets: Array<{
+          kind: string;
+          squadId: string;
+          anchor: string;
+          delay: number;
+          offsetX: number;
+          offsetZ: number;
+        }>;
+        squads: string[];
+        budgetLeft: number;
+      };
+      getEncounterSnapshot?: () => {
+        wave: number;
+        squads: string[];
+        tickets: Array<{
+          kind: string;
+          squadId: string;
+          anchor: string;
+          delay: number;
+          offsetX: number;
+          offsetZ: number;
+        }>;
+        enemies: Array<{
+          id?: string;
+          kind: string;
+          x: number;
+          z: number;
+          hp: number;
+          alive: boolean;
+          squadId?: string | null;
+          squadRole?: string | null;
+          anchor?: string | null;
+        }>;
+        squadGroups: Array<{
+          squadId: string;
+          count: number;
+          kinds: string[];
+          roles: string[];
+        }>;
+      };
       debugHitEnemy?: (
         id: string,
         damage: number,

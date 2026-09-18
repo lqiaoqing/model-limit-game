@@ -8,6 +8,7 @@ import {
 } from '../entities/Enemy';
 import { enemyFormTierForWave } from './EnemyAssets';
 import { composeWaveTickets, type SpawnTicket, type SquadRecipeId } from './EncounterDirector';
+import { SquadController } from './SquadController';
 
 export type WaveState = {
   wave: number;
@@ -33,6 +34,9 @@ export class WaveDirector {
   stressMode = false;
   /** Debug: skip enemy AI/movement updates. */
   freezeEnemies = false;
+  readonly squadController = new SquadController();
+  /** Last composed wave tickets (diagnostics/tests). */
+  lastTickets: SpawnTicket[] = [];
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -55,6 +59,8 @@ export class WaveDirector {
     this.totalThisWave = 0;
     this.bossRef = null;
     this.lastSquads = [];
+    this.lastTickets = [];
+    this.squadController.reset();
   }
 
   readonly enemies: Enemy[] = [];
@@ -131,6 +137,7 @@ export class WaveDirector {
       this.bossRef = null;
     }
 
+    this.squadController.apply(this.enemies, playerPos, delta);
     for (const enemy of this.enemies) {
       if (this.freezeEnemies) continue;
       enemy.update(delta, elapsed, playerPos, this.bounds);
@@ -197,6 +204,9 @@ export class WaveDirector {
     z: number;
     hp: number;
     alive: boolean;
+    squadId: string | null;
+    squadRole: string | null;
+    anchor: string | null;
   }> {
     return this.enemies.map((e) => ({
       id: e.group.uuid,
@@ -205,6 +215,9 @@ export class WaveDirector {
       z: e.group.position.z,
       hp: e.hp,
       alive: e.alive,
+      squadId: e.squadId,
+      squadRole: e.squadRole,
+      anchor: e.squadAnchor,
     }));
   }
 
@@ -237,10 +250,19 @@ export class WaveDirector {
         z = THREE.MathUtils.clamp(z + Math.sign(dz || 1) * 6, -hd, hd);
       }
     }
-    this.spawnEnemyAt(ticket.kind, x, z);
+    const enemy = this.spawnEnemyAt(ticket.kind, x, z);
+    if (enemy) {
+      enemy.squadId = ticket.squadId;
+      enemy.squadAnchor = ticket.anchor;
+    }
   }
 
-  private spawnEnemyAt(kind: EnemyKind, x: number, z: number, ringAroundPoint = false): void {
+  private spawnEnemyAt(
+    kind: EnemyKind,
+    x: number,
+    z: number,
+    ringAroundPoint = false,
+  ): Enemy | null {
     if (ringAroundPoint) {
       const hw = this.bounds.halfWidth - 1.2;
       const hd = this.bounds.halfDepth - 1.2;
@@ -270,6 +292,7 @@ export class WaveDirector {
     this.scene.add(enemy.group);
     this.spawnedThisWave += 1;
     if (kind === 'boss') this.bossRef = enemy;
+    return enemy;
   }
 
   private beginWave(): void {
@@ -285,6 +308,7 @@ export class WaveDirector {
     });
 
     this.spawnQueue = tickets;
+    this.lastTickets = tickets.slice();
     this.lastSquads = squads;
     this.totalThisWave = tickets.length;
     this.spawnedThisWave = 0;

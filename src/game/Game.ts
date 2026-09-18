@@ -30,6 +30,7 @@ import {
 } from '../systems/UpgradePool';
 import { enemyFormTierForWave } from '../systems/EnemyAssets';
 import { createSeededRandom } from '../utils/random';
+import { composeWaveTickets } from '../systems/EncounterDirector';
 import { WEAPON_DEFS, weaponAt, type WeaponId } from '../combat/Weapons';
 import { createCombatModifiers, EMERGENCY_HP_RATIO, EMERGENCY_SHIELD, modifierIds, PLASMA_FEEDBACK_HEAT_REFUND, resetCombatModifiers, type CombatModifiers } from '../combat/CombatModifiers';
 import { createCombatBuild, resetCombatBuild, resolveWeaponStats } from '../combat/CombatBuild';
@@ -2056,6 +2057,37 @@ export class Game {
         this.enemyBatch.sync(this.waves.enemies);
         return { ok: true, enemies: 0 };
       },
+      forceWave: (wave: number) => {
+        this.waves.debugSetWave(Math.max(1, wave), this.player.group.position);
+        this.lastWaveShown = this.waves.wave;
+        this.enemyBatch.sync(this.waves.enemies);
+        return { wave: this.waves.wave, squads: this.waves.squads };
+      },
+      composeEncounter: (wave: number, seed: number) => {
+        const rng = createSeededRandom(seed);
+        return composeWaveTickets({
+          wave,
+          stressMode: false,
+          rng,
+          bossWave: wave % 5 === 0,
+          halfWidth: 14,
+          halfDepth: 9,
+        });
+      },
+      getEncounterSnapshot: () => ({
+        wave: this.waves.wave,
+        squads: this.waves.squads,
+        tickets: this.waves.lastTickets.map((t) => ({
+          kind: t.kind,
+          squadId: t.squadId,
+          anchor: t.anchor,
+          delay: t.delay,
+          offsetX: t.offsetX,
+          offsetZ: t.offsetZ,
+        })),
+        enemies: this.waves.listEnemies(),
+        squadGroups: this.waves.squadController.snapshot(this.waves.enemies),
+      }),
       debugHitEnemy: (id: string, damage: number, fromX?: number, fromZ?: number) => {
         const target = this.waves.enemies.find((e) => e.group.uuid === id || e.stats.kind === id);
         if (!target) return { ok: false, hp: 0, alive: false, kind: '' };
