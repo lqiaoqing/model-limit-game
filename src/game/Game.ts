@@ -16,6 +16,8 @@ import { PostFx } from '../systems/PostFx';
 import { VfxSystem } from '../systems/VfxSystem';
 import { WorldFx } from '../systems/WorldFx';
 import { WaveDirector } from '../systems/WaveDirector';
+import { ArenaHazardSystem } from '../systems/ArenaHazardSystem';
+import { hazardBudgetForWave } from '../systems/ArenaHazardSystem';
 import { DebugTools, createDebugFlags, type DebugFlags, type DebugTuning } from '../systems/DebugTools';
 import { EnemyBatchRenderer } from '../systems/EnemyBatchRenderer';
 import { disposeEnemyAssets } from '../systems/EnemyAssets';
@@ -32,7 +34,7 @@ import { enemyFormTierForWave } from '../systems/EnemyAssets';
 import { createSeededRandom } from '../utils/random';
 import { composeWaveTickets } from '../systems/EncounterDirector';
 import { WEAPON_DEFS, weaponAt, type WeaponId } from '../combat/Weapons';
-import { createCombatModifiers, EMERGENCY_HP_RATIO, EMERGENCY_SHIELD, modifierIds, PLASMA_FEEDBACK_HEAT_REFUND, resetCombatModifiers, type CombatModifiers } from '../combat/CombatModifiers';
+import { createCombatModifiers, EMERGENCY_HP_RATIO, EMERGENCY_SHIELD, HAZARD_BUFF_WINDOW, modifierIds, PLASMA_FEEDBACK_HEAT_REFUND, resetCombatModifiers, type CombatModifiers } from '../combat/CombatModifiers';
 import { createCombatBuild, resetCombatBuild, resolveWeaponStats } from '../combat/CombatBuild';
 import { CombatSystem } from '../combat/CombatSystem';
 import {
@@ -145,6 +147,9 @@ export class Game {
   private disruptMoveMul = 1;
   private disruptHeatMul = 1;
   private disruptTimer = 0;
+  private hazardKills = 0;
+  private hazardBuffTimer = 0;
+  private hazards!: ArenaHazardSystem;
   private lastEnemyFormTier = 0;
   private fpsAccum = 0;
   private fpsFrames = 0;
@@ -193,6 +198,7 @@ export class Game {
     this.enemyBatch = new EnemyBatchRenderer(this.scene, 520);
     this.projectiles = new ProjectilePool(this.scene, 2500);
     this.waves = new WaveDirector(this.scene, ARENA, () => this.rng());
+    this.hazards = new ArenaHazardSystem(this.scene, ARENA, () => this.rng());
     this.combat = new CombatSystem({
       player: this.player,
       projectiles: this.projectiles,
@@ -475,7 +481,8 @@ export class Game {
         this.disruptHeatMul = 1;
       }
     }
-    this.player.fireIntervalMul = this.combat.getFireIntervalMul();
+    this.player.fireIntervalMul =
+      this.combat.getFireIntervalMul() * (this.hazardBuffTimer > 0 ? 0.9 : 1);
     this.player.moveSpeedMul = this.combat.getMoveSpeedMul() * this.disruptMoveMul;
     this.player.heatCoolMul = this.disruptHeatMul;
 
@@ -514,6 +521,36 @@ export class Game {
     this.waves.update(delta, this.player.group.position, elapsed);
     this.enemyBatch.sync(this.waves.enemies);
     const state = this.waves.getState();
+
+    if (this.hazardBuffTimer > 0) {
+      this.hazardBuffTimer = Math.max(0, this.hazardBuffTimer - delta);
+    }
+    this.hazards.update(delta, state.wave, this.player, this.waves.enemies, (ev) => {
+      if (ev.target === 'enemy' && ev.killed) {
+        this.hazardKills += 1;
+        if (this.combatMods.hazardConductor) {
+          this.hazardBuffTimer = HAZARD_BUFF_WINDOW;
+        }
+      }
+      if (ev.target === 'player') {
+        this.lastDeathCause = ev.kind;
+        if (ev.killed || !this.player.alive) this.onPlayerHurt();
+      }
+    });
+    if (this.hazards.playerInShock(this.player)) {
+      this.disruptMoveMul = 0.78;
+      this.disruptHeatMul = 0.7;
+      this.disruptTimer = Math.max(this.disruptTimer, 0.35);
+    }
+    // Player projectiles can arm overload cores.
+    for (const p of this.projectiles.projectiles) {
+      if (!p.active || p.owner !== 'player') continue;
+      const coreId = this.hazards.findCoreHit(p.group.position.x, p.group.position.z, p.radius);
+      if (!coreId) continue;
+      this.hazards.tryDamageCore(coreId, p.damage);
+      p.deactivate();
+    }
+
     if (state.wave !== this.lastWaveShown) {
       const prev = this.lastWaveShown;
       // Commit the wave first — otherwise openUpgrade's early return left
@@ -1227,6 +1264,9 @@ export class Game {
     this.disruptMoveMul = 1;
     this.disruptHeatMul = 1;
     this.disruptTimer = 0;
+    this.hazardKills = 0;
+    this.hazardBuffTimer = 0;
+    this.hazards.reset();
     this.hud.hideUpgradeCards();
     this.hud.setActiveWeapon('plasma');
     this.feel.reset();
@@ -2088,6 +2128,21 @@ export class Game {
         enemies: this.waves.listEnemies(),
         squadGroups: this.waves.squadController.snapshot(this.waves.enemies),
       }),
+      triggerHazard: (kind: string) => {
+        const k = kind as 'laser_gate' | 'shock_zone' | 'overload_core';
+        if (k !== 'laser_gate' && k !== 'shock_zone' && k !== 'overload_core') {
+          return { ok: false };
+        }
+        const state = this.hazards.forceSpawn(k);
+        return { ok: true, hazard: state };
+      },
+      getHazardSnapshot: () => ({
+        budget: hazardBudgetForWave(this.waves.wave),
+        hazards: this.hazards.snapshot(),
+        hazardKills: this.hazardKills,
+        playerInShock: this.hazards.playerInShock(this.player),
+      }),
+      planHazardSchedule: (wave: number, seed: number) => this.hazards.planSchedule(wave, seed),
       debugHitEnemy: (id: string, damage: number, fromX?: number, fromZ?: number) => {
         const target = this.waves.enemies.find((e) => e.group.uuid === id || e.stats.kind === id);
         if (!target) return { ok: false, hp: 0, alive: false, kind: '' };
@@ -2163,6 +2218,7 @@ export class Game {
       dps: this.combatTime > 0.05 ? Number((this.damageDealt / this.combatTime).toFixed(2)) : 0,
       killsPerSec:
         this.combatTime > 0.05 ? Number((this.kills / this.combatTime).toFixed(2)) : 0,
+      hazardKills: this.hazardKills,
       frameMs: this.frameMsSnapshot(),
       player: {
         hp: this.player.hp,

@@ -28,6 +28,7 @@ export type DiagnosticsInput = {
   hitsLanded: number;
   dps: number;
   killsPerSec: number;
+  hazardKills?: number;
   frameMs: { p50: number; p95: number; p99: number };
   player: {
     hp: number;

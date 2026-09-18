@@ -81,6 +81,34 @@ declare global {
         heatCoolMul: number;
         disruptTimer: number;
       };
+      triggerHazard?: (kind: string) => {
+        ok: boolean;
+        hazard?: {
+          id: string;
+          kind: string;
+          phase: string;
+          x: number;
+          z: number;
+          axis: number;
+          radius: number;
+          coreHp: number | null;
+        };
+      };
+      getHazardSnapshot?: () => {
+        budget: number;
+        hazards: Array<{
+          id: string;
+          kind: string;
+          phase: string;
+          x: number;
+          z: number;
+          coreHp: number | null;
+          kills: number;
+        }>;
+        hazardKills: number;
+        playerInShock: boolean;
+      };
+      planHazardSchedule?: (wave: number, seed: number) => string[];
       getBuildSnapshot?: () => {
         weapon: string;
         fireInterval: number;
@@ -128,6 +156,7 @@ declare global {
       dps?: number;
       killsPerSec?: number;
       frameMs?: { p50: number; p95: number; p99: number };
+      hazardKills?: number;
       player: {
         hp?: number;
         shield?: number;
