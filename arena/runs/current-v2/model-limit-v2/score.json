@@ -1,0 +1,246 @@
+{
+  "model": "current-v2",
+  "challenge": "model-limit-v2",
+  "root": "D:\\Work\\workspace\\model-limit-game",
+  "generatedAt": "2026-09-18T09:01:04.374Z",
+  "total": 0.8883,
+  "total100": 89,
+  "dimensions": {
+    "gameplay": {
+      "score": 1,
+      "weight": 0.2
+    },
+    "depth": {
+      "score": 1,
+      "weight": 0.15
+    },
+    "visual": {
+      "score": 1,
+      "weight": 0.15
+    },
+    "performance": {
+      "score": 0.7,
+      "weight": 0.15
+    },
+    "architecture": {
+      "score": 0.833,
+      "weight": 0.1
+    },
+    "tests": {
+      "score": 1,
+      "weight": 0.1
+    },
+    "mobile": {
+      "score": 1,
+      "weight": 0.05
+    },
+    "bugRate": {
+      "score": 0.6,
+      "weight": 0.05
+    },
+    "completion": {
+      "score": 0.4,
+      "weight": 0.05
+    }
+  },
+  "checks": {
+    "build": {
+      "ran": false,
+      "pass": false,
+      "code": null,
+      "note": "skipped"
+    },
+    "bot": {
+      "ran": false,
+      "pass": false,
+      "note": "skipped"
+    },
+    "balance": {
+      "ran": false,
+      "pass": false,
+      "note": "skipped",
+      "summary": null
+    }
+  },
+  "probes": {
+    "depth": {
+      "earned": 5.5,
+      "possible": 5.5,
+      "ratio": 1,
+      "details": [
+        {
+          "id": "weapons_module",
+          "hit": true,
+          "points": 1,
+          "note": "src/combat/Weapons.ts"
+        },
+        {
+          "id": "three_weapons",
+          "hit": true,
+          "points": 1,
+          "note": "src/combat/CombatBuild.ts"
+        },
+        {
+          "id": "rule_upgrades",
+          "hit": true,
+          "points": 1,
+          "note": "src/combat/CombatModifiers.ts"
+        },
+        {
+          "id": "encounter_director",
+          "hit": true,
+          "points": 1,
+          "note": "src/systems/EncounterDirector.ts"
+        },
+        {
+          "id": "boss_phases",
+          "hit": true,
+          "points": 1,
+          "note": "src/systems/BossPhases.ts"
+        },
+        {
+          "id": "pierce_projectile",
+          "hit": true,
+          "points": 0.5,
+          "note": "src/entities/Projectile.ts"
+        }
+      ]
+    },
+    "architecture": {
+      "earned": 2.5,
+      "possible": 3,
+      "ratio": 0.833,
+      "details": [
+        {
+          "id": "combat_system",
+          "hit": true,
+          "points": 1,
+          "note": "src/combat/CombatSystem.ts"
+        },
+        {
+          "id": "telemetry",
+          "hit": true,
+          "points": 0.75,
+          "note": "src/telemetry/buildDiagnostics.ts"
+        },
+        {
+          "id": "render_backend",
+          "hit": true,
+          "points": 0.75,
+          "note": "src/core/RenderBackend.ts"
+        },
+        {
+          "id": "game_not_monolith",
+          "hit": false,
+          "points": 0.5,
+          "note": "src/game/Game.ts lines=2372"
+        }
+      ]
+    },
+    "visual": {
+      "earned": 2,
+      "possible": 2,
+      "ratio": 1,
+      "details": [
+        {
+          "id": "instanced_enemies",
+          "hit": true,
+          "points": 1,
+          "note": "src/systems/EnemyBatchRenderer.ts"
+        },
+        {
+          "id": "vfx_system",
+          "hit": true,
+          "points": 0.5,
+          "note": "src/systems/VfxSystem.ts"
+        },
+        {
+          "id": "postfx_or_lighting",
+          "hit": true,
+          "points": 0.5,
+          "note": "src/core/RenderBackend.ts"
+        }
+      ]
+    },
+    "performance": {
+      "earned": 2,
+      "possible": 2,
+      "ratio": 1,
+      "details": [
+        {
+          "id": "stress_mode",
+          "hit": true,
+          "points": 0.5,
+          "note": "src/game/Game.ts"
+        },
+        {
+          "id": "high_capacity_pool",
+          "hit": true,
+          "points": 0.5,
+          "note": "src/entities/Enemy.ts"
+        },
+        {
+          "id": "balance_harness",
+          "hit": true,
+          "points": 1,
+          "note": "scripts/balance-harness.mjs"
+        }
+      ]
+    },
+    "tests": {
+      "earned": 2,
+      "possible": 2,
+      "ratio": 1,
+      "details": [
+        {
+          "id": "playwright_config",
+          "hit": true,
+          "points": 0.5,
+          "note": "playwright.config.ts"
+        },
+        {
+          "id": "bot_or_e2e",
+          "hit": true,
+          "points": 1,
+          "note": "tests/bot-playtest.spec.ts"
+        },
+        {
+          "id": "package_test_script",
+          "hit": true,
+          "points": 0.5,
+          "note": "package.json"
+        }
+      ]
+    },
+    "mobile": {
+      "earned": 1.5,
+      "possible": 1.5,
+      "ratio": 1,
+      "details": [
+        {
+          "id": "touch_controls",
+          "hit": true,
+          "points": 1,
+          "note": "src/core/InputController.ts"
+        },
+        {
+          "id": "mobile_meta",
+          "hit": true,
+          "points": 0.5,
+          "note": "index.html"
+        }
+      ]
+    }
+  },
+  "weights": {
+    "gameplay": 0.2,
+    "depth": 0.15,
+    "visual": 0.15,
+    "performance": 0.15,
+    "architecture": 0.1,
+    "tests": 0.1,
+    "mobile": 0.05,
+    "bugRate": 0.05,
+    "completion": 0.05
+  }
+}

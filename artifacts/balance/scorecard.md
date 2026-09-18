@@ -1,18 +1,19 @@
 # Balance Scorecard
 
-- Generated: 2026-09-17T06:34:55.689Z
+- Generated: 2026-09-18T08:59:50.900Z
 - Seeds: 42, 137
 - Session duration: 8s per seed × weapon
-- Runs: 6
-- Mean DPS across weapons: 0.33
+- Runs: 8
+- Mean DPS across weapons: 5.55
 
 ## Weapon balance
 
-| Weapon | Kills avg | Score avg | DPS avg | Deaths avg | Overheat | FPS p50 | FPS p95 | Note |
+| Weapon | Kills avg | DPS avg | Kills/s | Deaths avg | Overheat | Frame p50/p99 | FPS p50 | Note |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
-| plasma | 2.5 | 282.5 | 0.31 | 0 | 0 | 56.7 / 56.4 | 60 | ok |
-| rail | 4 | 437.5 | 0.49 | 0 | 0 | 59.6 / 60 | 60 | OP? |
-| scatter | 1.5 | 157.5 | 0.18 | 0 | 0 | 59.5 / 60 | 60 | weak? |
+| plasma | 1 | 7.08 | 0.12 | 0 | 0 | 16.7 / 25.1 | 58.8 | OP? |
+| rail | 1.5 | 6.2 | 0.18 | 0 | 0 | 16.7 / 25 | 58.8 | ok |
+| scatter | 1 | 6.68 | 0.12 | 0 | 0 | 16.7 / 25.1 | 58.8 | OP? |
+| launcher | 0 | 2.26 | 0 | 0 | 0 | 16.7 / 25.1 | 58.8 | weak? |
 
 ## Upgrade stack totals (end of sessions)
 
@@ -22,12 +23,14 @@ _No upgrades recorded._
 
 | Seed | Weapon | Kills | DPS | Deaths | Wave | FPS p95 | Mode end |
 |---:|---|---:|---:|---:|---:|---:|---|
-| 42 | plasma | 2 | 0.25 | 0 | 1 | 60 | play |
-| 42 | rail | 5 | 0.62 | 0 | 1 | 60 | play |
-| 42 | scatter | 3 | 0.36 | 0 | 1 | 60 | play |
-| 137 | plasma | 3 | 0.37 | 0 | 1 | 60 | play |
-| 137 | rail | 3 | 0.37 | 0 | 1 | 60 | play |
-| 137 | scatter | 0 | 0 | 0 | 1 | 60 | play |
+| 42 | plasma | 1 | 9.92 | 0 | 1 | 60 | play |
+| 42 | rail | 0 | 0 | 0 | 1 | 60 | play |
+| 42 | scatter | 1 | 7.4 | 0 | 1 | 60 | play |
+| 42 | launcher | 0 | 0 | 0 | 1 | 60 | play |
+| 137 | plasma | 1 | 4.25 | 0 | 1 | 60 | play |
+| 137 | rail | 3 | 12.39 | 0 | 1 | 60 | play |
+| 137 | scatter | 1 | 5.96 | 0 | 1 | 60 | play |
+| 137 | launcher | 0 | 4.52 | 0 | 1 | 60 | play |
 
 ## Notes
 

@@ -1,28 +1,47 @@
 ---
 feature: v2-combat-depth
-status: alpha
-updated: 2026-09-12
-branch: feat/v2-combat-depth
-commits: c2a25531141e941f544f71f906852836305dcd6f..HEAD
+status: beta
+updated: 2026-09-18
+branch: feat/v2-content-completion
+commits: 909fb64..HEAD
 ---
 
-# V2 Combat Depth Vertical Slice
+# V2 Combat Depth — Gameplay Beta
 
 ## Report
 
-**What was built** — Neon Siege Arena V2 combat-depth **vertical slice (alpha)**: three switchable weapons; hybrid retrofit pool with rule modifiers; EncounterDirector **SpawnTicket formations** (hunter pack / artillery nest / shield wall / assassin pincer / suppression); TITAN-07 phases with real `moveSpeedMul` / `fireIntervalMul` on Enemy. Explicit `CombatBuild` (`global` + `perWeapon` + `modifiers`) + pure `resolveWeaponStats` so Rail Bore / Scatter Choke cannot leak into other weapons. Formal regression `tests/v2-combat.spec.ts` covers round-trip identity, pollution, encounter presence, DPS/frameMs diagnostics.
+**What was built** — Neon Siege Arena **V2 Gameplay Beta**: 4 weapons (Plasma / Rail / Scatter / **Ion Launcher** with impact AoE); ~30 upgrades (**22 rule-changing**); 8 normal enemy archetypes + **7 tactical squad recipes** with post-spawn SquadController; **3 arena hazards** (laser gate / shock zone / overload core); **3 bosses** (TITAN-07, ORBITAL WARDEN, VOID ENGINE) via BossDirector; Wave **1–15** progression with unlock gates; combat telemetry breakdowns for balance harness.
 
-**Not delivered yet** — 4th weapon, 30 upgrades, 8 archetypes, 3 bosses, hazards, 15–20 min full run.
+**Explicit CombatBuild** kept: `global` + `perWeapon` + `modifiers` + pure `resolveWeaponStats`. Rule upgrades cannot leak across weapons (regression-tested).
 
 **Verification** —
-- `npx tsc --noEmit` PASS
-- `npx playwright test --project=desktop-chrome` PASS (bot + v2-combat ×5 + visual)
+- `npm run build` PASS
+- Playwright `desktop-chrome` **43/43 PASS** (bot, combat, content, upgrades, enemies, squads, hazards, bosses, progress, telemetry, visual)
+- `npm run balance:full` PASS — 20 runs (5 seeds × 4 weapons); mean DPS 7.53; frameMs p50 ≈ 16.7–20
+- Arena eval + compare refreshed under `arena/runs/` (evidence only; not used to retune gameplay)
 
 **Journey log** —
-1. `captureWeaponBonuses` reverse-engineering leaked weapon-affinity damage across guns; replaced by explicit CombatBuild.
-2. Director previously flattened squads to random edge spawns; SpawnTickets carry anchor/formation/delay.
-3. Boss `moveSpeedMul` was only scaling summon timers; now multiplies Enemy speed and fire interval.
-4. Spec statuses demoted from delivered → alpha/prototype after review.
+1. `captureWeaponBonuses` reverse-engineering leaked weapon-affinity damage; replaced by explicit CombatBuild.
+2. Director previously flattened squads to random edge spawns; SpawnTickets carry anchor/formation/delay; SquadController adds role/facetiming after spawn.
+3. Boss logic left Game.ts — BossDefinitions + BossDirector own three identities.
+4. Wave 1–15 gates audited: locked archetypes never appear early; boss tickets map wave→bossId.
+5. Telemetry labels real DPS (damage/combatTime) and keeps kills/s separate.
+
+## Definition checks
+
+| Item | Status |
+|---|---|
+| 4 weapons + Ion AoE identity | done |
+| ~28 upgrades / ≥16 rule-changing | 30 / 22 |
+| ≥8 observable synergies | modifiers + telemetry |
+| 8 normal archetypes | done |
+| ≥7 tactical recipes | 7 |
+| 3 hazards / 3 bosses × ≥3 phases | done |
+| Wave 1–15 full cycle | audited |
+| Core regressions | desktop suite green |
+| build / test / balance:full | PASS |
+
+V2.5 and V3 remain **prototype**.
 
 ## [S1] Problem
 
@@ -37,46 +56,34 @@ As a result, runs do not truly diverge, and the project does not yet stress the 
 
 ## [S2] Design
 
-Ship one coherent vertical slice: **3 weapons + hybrid rule-modifier upgrade pool + EncounterDirector squads layered on WaveDirector + one multi-phase Titan boss**. Keep Stress flood, seed RNG, bot hooks, and mobile controls working.
+Ship one coherent vertical slice expanded to **beta content depth**: **4 weapons + hybrid rule-modifier upgrade pool + EncounterDirector squads + SquadController + hazards + 3 bosses + Wave 1–15 gates**. Keep Stress flood, seed RNG, bot hooks, and mobile controls working.
 
 ### S2.1 Combat state model
 
-Introduce a run-scoped combat build held by `Game`:
+Run-scoped combat build held by `Game`:
 
 ```ts
-type WeaponId = 'plasma' | 'rail' | 'scatter';
-
-type CombatModifiers = {
-  arcChain: number;
-  overheatEmp: boolean;
-  critConductor: boolean;
-  railPierce: number;
-  railHeatRefund: boolean;
-  scatterCloseBonus: boolean;
-  dashDetonation: boolean;
-  shieldNova: boolean;
-};
+type WeaponId = 'plasma' | 'rail' | 'scatter' | 'launcher';
 ```
 
-`PlayerStats` remains the numeric layer. Rule modifiers live in `CombatModifiers` and are consulted by combat resolution. Weapon switching stores retrofit deltas in `weaponBonuses { fireMul, speedMul, dmgBonus }` relative to the **active** `WEAPON_DEFS[id]`, never vs plasma defaults.
+`PlayerStats` remains the numeric layer. Rule modifiers live in `CombatModifiers` and are consulted by combat resolution.
 
 ### S2.2 Weapons
 
-| Id | Name | Behavior | Notes |
-|---|---|---|---|
-| `plasma` | Plasma Repeater | Fast single shot | Default; Arc / Overheat Cascade |
-| `rail` | Railgun | Slow heavy, base pierce 2 | Bore / Heat Refund |
-| `scatter` | Scattergun | 5-pellet spread | Close Bonus / Dash Detonation |
-
-- Keys `1/2/3` select weapons in `play`; same keys pick upgrades in `upgrade` mode only.
-- Mobile: tappable HUD chips.
-- Projectiles carry `pierce`, `hitsLanded`, `hitSet`, `sourceWeapon`.
+| Id | Name | Behavior |
+|---|---|---|
+| `plasma` | Plasma Repeater | Fast single shot |
+| `rail` | Railgun | Slow heavy, base pierce 2 |
+| `scatter` | Scattergun | 5-pellet spread |
+| `launcher` | Ion Launcher | Slow bolt → **radial impact blast** |
 
 ### S2.3 Hybrid upgrade pool
 
-~16 offers. Stat comfort modules kept: overclock, thrusters, armor, shield_bank, coolant_loop, capacitor, dash_servos, mag_accel.
+30 offers; rule modules cover plasma/rail/scatter/ion/global (expansion, aftershock, heat sink, emergency protocol, momentum core, hazard conductor, …).
 
-Rule modules: `arc_capacitor`, `overheat_cascade`, `critical_conductor`, `rail_bore`, `rail_reactor`, `scatter_choke`, `dash_detonation`, `shield_nova` with weapon affinity ×1.6 weight when matching active weapon.
+### S2.4–S2.8 Content systems
+
+Enemy archetypes, squad recipes, hazards, bosses, and wave gates are implemented under `src/systems/` (EnemyArchetypes, SquadController, ArenaHazardSystem, BossDefinitions/BossDirector, WaveProgression) rather than packed into `Game.ts`.
 
 ### S2.4 EncounterDirector
 
