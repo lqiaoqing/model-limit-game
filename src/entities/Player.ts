@@ -92,7 +92,7 @@ export class Player {
   private formTier = 0;
   private readonly formGroups: THREE.Group[] = [];
   private readonly formAccents: THREE.MeshStandardMaterial[] = [];
-  private weaponId: 'plasma' | 'rail' | 'scatter' = 'plasma';
+  private weaponId: 'plasma' | 'rail' | 'scatter' | 'launcher' = 'plasma';
   private cannonBody!: THREE.Mesh;
   private cannonShroud!: THREE.Mesh;
   private muzzleRing!: THREE.Mesh;
@@ -303,7 +303,7 @@ export class Player {
    * Make plasma / rail / scatter read differently on the mech:
    * barrel length/width, muzzle glow, and weapon-color tint.
    */
-  setWeaponVisual(id: 'plasma' | 'rail' | 'scatter'): void {
+  setWeaponVisual(id: 'plasma' | 'rail' | 'scatter' | 'launcher'): void {
     this.weaponId = id;
     this.applyWeaponVisual();
   }
@@ -311,7 +311,13 @@ export class Player {
   private applyWeaponVisual(): void {
     const id = this.weaponId;
     const weaponColor =
-      id === 'rail' ? '#fbbf24' : id === 'scatter' ? '#f472b6' : '#22d3ee';
+      id === 'rail'
+        ? '#fbbf24'
+        : id === 'scatter'
+          ? '#f472b6'
+          : id === 'launcher'
+            ? '#4ade80'
+            : '#22d3ee';
 
     // Barrel silhouette
     if (id === 'rail') {
@@ -332,6 +338,15 @@ export class Player {
       this.muzzleRing.scale.set(1.7, 1.7, 1.7);
       this.muzzleRing.position.set(-0.42, 0.55, -1.18);
       this.glowMat.emissiveIntensity = 1.6;
+    } else if (id === 'launcher') {
+      // Fat ion tube — short, wide muzzle, bulky shroud
+      this.cannonBody.scale.set(1.35, 1.45, 0.95);
+      this.cannonBody.position.set(-0.42, 0.58, -0.78);
+      this.cannonShroud.scale.set(1.45, 1.4, 1.2);
+      this.cannonShroud.position.set(-0.42, 0.58, -0.22);
+      this.muzzleRing.scale.set(1.85, 1.85, 1.35);
+      this.muzzleRing.position.set(-0.42, 0.58, -1.22);
+      this.glowMat.emissiveIntensity = 2.2;
     } else {
       // Balanced plasma repeater
       this.cannonBody.scale.set(1, 1, 1);

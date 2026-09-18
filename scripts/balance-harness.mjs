@@ -62,6 +62,8 @@ const WEAPONS = [
   { id: 'plasma', key: 'Digit1' },
   { id: 'rail', key: 'Digit2' },
   { id: 'scatter', key: 'Digit3' },
+  { id: 'launcher', key: 'Digit4' },
+  { id: 'launcher', key: 'Digit4' },
 ];
 
 const MOVE_KEYS = [

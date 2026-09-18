@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Player } from '../entities/Player';
-import type { ProjectilePool } from '../entities/Projectile';
+import type { Projectile, ProjectilePool } from '../entities/Projectile';
 import type { Enemy } from '../entities/Enemy';
 import type { WaveDirector } from '../systems/WaveDirector';
 import type { VfxSystem } from '../systems/VfxSystem';
@@ -16,6 +16,11 @@ import {
   CRIT_MULTIPLIER,
   DASH_BLAST_DAMAGE,
   DASH_BLAST_RADIUS,
+  ION_AFTERSHOCK_DAMAGE_MUL,
+  ION_AFTERSHOCK_DELAY,
+  ION_AFTERSHOCK_RADIUS_MUL,
+  ION_AOE_FALLOFF,
+  ION_HEAT_REFUND_CAP,
   OVERHEAT_EMP_DAMAGE,
   OVERHEAT_EMP_RADIUS,
   SCATTER_CLOSE_RANGE,
@@ -55,6 +60,12 @@ export type CombatDeps = {
 /** Weapon fire, projectile hits, and rule-modifier combat side effects. */
 export class CombatSystem {
   private readonly dashBlasts: Array<{ pos: THREE.Vector3; timer: number }> = [];
+  private readonly ionBlasts: Array<{
+    pos: THREE.Vector3;
+    damage: number;
+    radius: number;
+    timer: number;
+  }> = [];
   private chainDepth = 0;
   private readonly tmpDir = new THREE.Vector3();
   private readonly tmpUp = new THREE.Vector3(0, 1, 0);
@@ -63,6 +74,7 @@ export class CombatSystem {
 
   reset(): void {
     this.dashBlasts.length = 0;
+    this.ionBlasts.length = 0;
     this.chainDepth = 0;
   }
 
@@ -89,23 +101,103 @@ export class CombatSystem {
         resolved.damage,
         'player',
         resolved.color,
-        { pierce: resolved.pierce, sourceWeapon: resolved.def.id },
+        {
+          pierce: resolved.pierce,
+          sourceWeapon: resolved.def.id,
+          aoeRadius: resolved.aoeRadius,
+        },
       );
     }
     this.deps.onShot?.(resolved.pellets, resolved.def.id);
     const weaponId = resolved.def.id;
-    const burstCount = weaponId === 'scatter' ? 8 : weaponId === 'rail' ? 6 : 3;
-    const burstSpeed = weaponId === 'rail' ? 6.5 : weaponId === 'scatter' ? 4.2 : 3.5;
+    const burstCount =
+      weaponId === 'launcher' ? 10 : weaponId === 'scatter' ? 8 : weaponId === 'rail' ? 6 : 3;
+    const burstSpeed =
+      weaponId === 'launcher' ? 5.2 : weaponId === 'rail' ? 6.5 : weaponId === 'scatter' ? 4.2 : 3.5;
     vfx.spawnBurst(player.muzzle, resolved.color, burstCount, burstSpeed);
     vfx.spawnBurst(
       player.muzzle
         .clone()
         .add(new THREE.Vector3(-player.aim.y, 0.1, player.aim.x).multiplyScalar(0.2)),
       resolved.color,
-      weaponId === 'rail' ? 3 : 1,
+      weaponId === 'rail' || weaponId === 'launcher' ? 3 : 1,
       2.2,
     );
-    feel.triggerFovPunch(resolved.def.id === 'rail' ? 2.2 : 1.1);
+    feel.triggerFovPunch(
+      resolved.def.id === 'rail' ? 2.2 : resolved.def.id === 'launcher' ? 2.6 : 1.1,
+    );
+  }
+
+  /** Radial impact blast — Ion Launcher identity. */
+  private explodeIon(pos: THREE.Vector3, damage: number, radius: number): number {
+    const { waves, vfx, worldFx, audio, feel, combatMods, onEnemyKilled, onDamageDealt } =
+      this.deps;
+    const hits: Enemy[] = [];
+    let totalDamage = 0;
+    for (const enemy of waves.enemies) {
+      if (!enemy.alive) continue;
+      const dx = enemy.group.position.x - pos.x;
+      const dz = enemy.group.position.z - pos.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > radius * radius) continue;
+      hits.push(enemy);
+    }
+    if (hits.length === 0) {
+      vfx.spawnShockwave(pos, '#4ade80', radius * 0.7);
+      worldFx.triggerPulse(pos, '#4ade80', radius);
+      return 0;
+    }
+    vfx.spawnShockwave(pos, '#4ade80', radius * 0.75);
+    worldFx.triggerPulse(pos, '#4ade80', radius);
+    audio.hit();
+    feel.triggerFovPunch(1.6);
+    for (const enemy of hits) {
+      const dx = enemy.group.position.x - pos.x;
+      const dz = enemy.group.position.z - pos.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      const falloff = dist <= 0.05 ? 1 : ION_AOE_FALLOFF + (1 - ION_AOE_FALLOFF) * (1 - dist / radius);
+      let dmg = damage * Math.max(ION_AOE_FALLOFF, falloff);
+      const playerMul = this.deps.getPlayerDamageMul?.() ?? 1;
+      if (playerMul !== 1) dmg *= playerMul;
+      if (this.deps.getEnemyOneHp?.()) dmg = Math.max(dmg, 999999);
+      const died = enemy.takeDamage(dmg);
+      totalDamage += dmg;
+      onDamageDealt?.(dmg, 'launcher');
+      vfx.spawnBurst(enemy.group.position.clone().setY(0.4), '#4ade80', 7, 4.5);
+      if (!died) {
+        enemy.staggerTimer = Math.max(enemy.staggerTimer, 0.2);
+        const knock = Math.max(dist, 0.001);
+        enemy.knockback(dx / knock, dz / knock, 8, 0.15);
+      } else {
+        onEnemyKilled(enemy, { sourceWeapon: 'launcher', damage: dmg });
+      }
+    }
+    const refund =
+      combatMods.ionHeatRefundPerHit > 0
+        ? Math.min(ION_HEAT_REFUND_CAP, combatMods.ionHeatRefundPerHit * hits.length)
+        : 0;
+    if (refund > 0) {
+      this.deps.player.coolHeat(refund);
+    }
+    return totalDamage;
+  }
+
+  private queueIonAftershock(pos: THREE.Vector3, damage: number, radius: number): void {
+    if (!this.deps.combatMods.ionAftershock) return;
+    this.ionBlasts.push({
+      pos: pos.clone().setY(0.2),
+      damage: damage * ION_AFTERSHOCK_DAMAGE_MUL,
+      radius: radius * ION_AFTERSHOCK_RADIUS_MUL,
+      timer: ION_AFTERSHOCK_DELAY,
+    });
+  }
+
+  private impactIon(projectile: Projectile, pos: THREE.Vector3): void {
+    const build = this.deps.getBuild();
+    const mods = build.modifiers;
+    const baseRadius = (projectile.aoeRadius > 0 ? projectile.aoeRadius : 2.4) * mods.ionBlastRadiusMul;
+    this.explodeIon(pos.clone().setY(0.2), projectile.damage, baseRadius);
+    this.queueIonAftershock(pos, projectile.damage, baseRadius);
   }
 
   resolveProjectileHits(arena: { halfWidth: number; halfDepth: number }, covers: { blocksPoint(p: THREE.Vector3): boolean; takeDamage(n: number): void }[]): void {
@@ -116,6 +208,14 @@ export class CombatSystem {
       const pos = p.group.position;
 
       if (Math.abs(pos.x) > arena.halfWidth + 2 || Math.abs(pos.z) > arena.halfDepth + 2) {
+        if (p.owner === 'player' && p.sourceWeapon === 'launcher' && p.aoeRadius > 0) {
+          const clamped = new THREE.Vector3(
+            Math.max(-arena.halfWidth, Math.min(arena.halfWidth, pos.x)),
+            0.2,
+            Math.max(-arena.halfDepth, Math.min(arena.halfDepth, pos.z)),
+          );
+          this.impactIon(p, clamped);
+        }
         p.deactivate();
         continue;
       }
@@ -123,8 +223,13 @@ export class CombatSystem {
       let blocked = false;
       for (const cover of covers) {
         if (cover.blocksPoint(pos)) {
-          cover.takeDamage(p.damage * 0.5);
-          vfx.spawnBurst(pos, '#94a3b8', 4, 3);
+          if (p.owner === 'player' && p.sourceWeapon === 'launcher' && p.aoeRadius > 0) {
+            cover.takeDamage(p.damage * 0.8);
+            this.impactIon(p, pos);
+          } else {
+            cover.takeDamage(p.damage * 0.5);
+            vfx.spawnBurst(pos, '#94a3b8', 4, 3);
+          }
           p.deactivate();
           blocked = true;
           break;
@@ -142,6 +247,11 @@ export class CombatSystem {
           if (dx * dx + dz * dz <= rr * rr) {
             p.hitSet.add(enemy.group.uuid);
             enemy.hitFlash();
+            if (p.sourceWeapon === 'launcher' && p.aoeRadius > 0) {
+              this.impactIon(p, pos);
+              p.deactivate();
+              break;
+            }
             let dmg = p.damage;
             const playerMul = this.deps.getPlayerDamageMul?.() ?? 1;
             if (playerMul !== 1) dmg *= playerMul;
@@ -284,6 +394,16 @@ export class CombatSystem {
         if (died) onEnemyKilled(enemy);
       }
       this.dashBlasts.splice(i, 1);
+    }
+  }
+
+  tickIonBlasts(delta: number): void {
+    for (let i = this.ionBlasts.length - 1; i >= 0; i -= 1) {
+      const blast = this.ionBlasts[i];
+      blast.timer -= delta;
+      if (blast.timer > 0) continue;
+      this.explodeIon(blast.pos, blast.damage, blast.radius);
+      this.ionBlasts.splice(i, 1);
     }
   }
 }

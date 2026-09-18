@@ -44,6 +44,7 @@ export function createCombatBuild(modifiers: CombatModifiers): CombatBuild {
       plasma: defaultWeaponBonus(),
       rail: defaultWeaponBonus(),
       scatter: defaultWeaponBonus(),
+      launcher: defaultWeaponBonus(),
     },
     modifiers,
   };
@@ -56,6 +57,7 @@ export function resetCombatBuild(build: CombatBuild, modifiers: CombatModifiers)
     plasma: defaultWeaponBonus(),
     rail: defaultWeaponBonus(),
     scatter: defaultWeaponBonus(),
+    launcher: defaultWeaponBonus(),
   };
   build.modifiers = modifiers;
 }
@@ -70,6 +72,7 @@ export type ResolvedWeaponStats = {
   spread: number;
   pellets: number;
   color: string;
+  aoeRadius: number;
 };
 
 /** Pure resolver: weapon def × global × per-weapon × rule modifiers. */
@@ -89,6 +92,7 @@ export function resolveWeaponStats(build: CombatBuild, weaponId: WeaponId): Reso
     spread: def.spread * pw.spreadMul,
     pellets: def.pellets,
     color: def.color,
+    aoeRadius: def.aoeRadius ?? 0,
   };
 }
 

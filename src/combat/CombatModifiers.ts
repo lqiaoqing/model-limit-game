@@ -7,6 +7,12 @@ export type CombatModifiers = {
   scatterCloseBonus: boolean;
   dashDetonation: boolean;
   shieldNova: boolean;
+  /** Ion Launcher: blast radius multiplier stacks (1 = base). */
+  ionBlastRadiusMul: number;
+  /** Ion Launcher: delayed secondary blast after impact. */
+  ionAftershock: boolean;
+  /** Ion Launcher: refund heat per enemy hit by blast (capped upstream). */
+  ionHeatRefundPerHit: number;
 };
 
 export const DEFAULT_COMBAT_MODIFIERS: CombatModifiers = {
@@ -18,6 +24,9 @@ export const DEFAULT_COMBAT_MODIFIERS: CombatModifiers = {
   scatterCloseBonus: false,
   dashDetonation: false,
   shieldNova: false,
+  ionBlastRadiusMul: 1,
+  ionAftershock: false,
+  ionHeatRefundPerHit: 0,
 };
 
 export function createCombatModifiers(): CombatModifiers {
@@ -51,3 +60,8 @@ export const DASH_BLAST_RADIUS = 3.2;
 export const DASH_BLAST_DAMAGE = 22;
 export const SHIELD_NOVA_RADIUS = 4.5;
 export const SHIELD_NOVA_DAMAGE = 16;
+export const ION_AOE_FALLOFF = 0.45;
+export const ION_HEAT_REFUND_CAP = 8;
+export const ION_AFTERSHOCK_DELAY = 0.5;
+export const ION_AFTERSHOCK_DAMAGE_MUL = 0.45;
+export const ION_AFTERSHOCK_RADIUS_MUL = 0.85;

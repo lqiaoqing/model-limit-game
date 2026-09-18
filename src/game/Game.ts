@@ -5,7 +5,7 @@ import { createRenderBackend, initRenderBackend, resizeBackend, type RenderBacke
 import { Cover } from '../entities/Cover';
 import { Pickup, type PickupKind } from '../entities/Pickup';
 import { Player, DEFAULT_PLAYER_STATS, type ArenaBounds } from '../entities/Player';
-import type { Enemy } from '../entities/Enemy';
+import { ENEMY_TEMPLATES, type Enemy, type EnemyKind } from '../entities/Enemy';
 import { ProjectilePool } from '../entities/Projectile';
 import { AudioSystem } from '../systems/AudioSystem';
 import { CameraRig } from '../systems/CameraRig';
@@ -464,6 +464,7 @@ export class Game {
     }
 
     this.combat.tickDashBlasts(delta);
+    this.combat.tickIonBlasts(delta);
 
     // Heat steam
     if (this.player.getHeatRatio() > 0.45 && this.rng() < 0.35) {
@@ -1922,8 +1923,29 @@ export class Game {
         this.publishDiagnostics();
         return { ok: true, weapon: this.weapon };
       },
+      forceWeapon: (id: string) => {
+        if (!(id in WEAPON_DEFS)) return { ok: false, weapon: this.weapon };
+        this.setWeapon(id as WeaponId);
+        return { ok: true, weapon: this.weapon };
+      },
+      spawnEnemy: (kind: string, x?: number, z?: number) => {
+        const k = kind as EnemyKind;
+        if (!(k in ENEMY_TEMPLATES)) return { ok: false, enemies: this.waves.enemies.length };
+        if (typeof x === 'number' && typeof z === 'number') {
+          this.waves.spawnAt(k, x, z);
+        } else {
+          this.waves.forceSpawnNear(this.player.group.position, k);
+        }
+        this.enemyBatch.sync(this.waves.enemies);
+        return { ok: true, enemies: this.waves.enemies.length };
+      },
+      getEnemies: () => this.waves.listEnemies(),
       getBuildSnapshot: () => {
         const resolved = resolveWeaponStats(this.combatBuild, this.weapon);
+        const perWeaponDamage: Record<string, number> = {};
+        for (const weaponId of Object.keys(WEAPON_DEFS) as WeaponId[]) {
+          perWeaponDamage[weaponId] = resolveWeaponStats(this.combatBuild, weaponId).damage;
+        }
         return {
           weapon: this.weapon,
           fireInterval: resolved.fireInterval,
@@ -1931,8 +1953,11 @@ export class Game {
           projectileSpeed: resolved.projectileSpeed,
           pierce: resolved.pierce,
           spread: resolved.spread,
+          aoeRadius: resolved.aoeRadius,
+          heatPerShot: resolved.heatPerShot,
           modifiers: modifierIds(this.combatMods),
           stacks: { ...this.upgradeStacks },
+          perWeaponDamage,
         };
       },
     };

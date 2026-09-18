@@ -8,9 +8,9 @@ export type InputFrame = {
   ultPressed: boolean;
   pausePressed: boolean;
   restartPressed: boolean;
-  /** 0/1/2 when Digit1/2/3 pressed this frame; -1 otherwise. */
+  /** 0/1/2/3 when Digit1–4 pressed this frame; -1 otherwise. */
   upgradeChoice: number;
-  /** 0/1/2 when Digit1/2/3 pressed this frame for weapon swap (play mode). */
+  /** 0/1/2/3 when Digit1–4 pressed this frame for weapon swap (play mode). */
   weaponChoice: number;
 };
 
@@ -71,6 +71,11 @@ export class InputController {
       if (!event.repeat) {
         this.upgradeQueued = 2;
         this.weaponQueued = 2;
+      }
+    }
+    if (event.code === 'Digit4' || event.code === 'Numpad4') {
+      if (!event.repeat) {
+        this.weaponQueued = 3;
       }
     }
   };

@@ -185,6 +185,21 @@ export class WaveDirector {
     this.spawnEnemyAt(kind, x, z);
   }
 
+  /** Deterministic spawn at an exact world XZ (test hooks / scripted setups). */
+  spawnAt(kind: EnemyKind, x: number, z: number): void {
+    this.spawnEnemyAt(kind, x, z);
+  }
+
+  listEnemies(): Array<{ kind: string; x: number; z: number; hp: number; alive: boolean }> {
+    return this.enemies.map((e) => ({
+      kind: e.stats.kind,
+      x: e.group.position.x,
+      z: e.group.position.z,
+      hp: e.hp,
+      alive: e.alive,
+    }));
+  }
+
   private spawnFromTicket(ticket: SpawnTicket, playerPos: THREE.Vector3): void {
     const hw = this.bounds.halfWidth - 1.2;
     const hd = this.bounds.halfDepth - 1.2;

@@ -10,6 +10,19 @@ declare global {
       hideDebugUi: (hidden: boolean) => void;
       pickUpgrade: (index: number) => { mode: string };
       grantUpgrade?: (id: string) => { ok: boolean; weapon?: string };
+      forceWeapon?: (id: string) => { ok: boolean; weapon?: string };
+      spawnEnemy?: (
+        kind: string,
+        x?: number,
+        z?: number,
+      ) => { ok: boolean; enemies: number };
+      getEnemies?: () => Array<{
+        kind: string;
+        x: number;
+        z: number;
+        hp: number;
+        alive: boolean;
+      }>;
       getBuildSnapshot?: () => {
         weapon: string;
         fireInterval: number;
@@ -17,8 +30,11 @@ declare global {
         projectileSpeed: number;
         pierce: number;
         spread: number;
+        aoeRadius?: number;
+        heatPerShot?: number;
         modifiers: string[];
         stacks: Record<string, number>;
+        perWeaponDamage?: Record<string, number>;
       };
     };
     __THREE_GAME_DIAGNOSTICS__?: {

@@ -1,4 +1,4 @@
-export type WeaponId = 'plasma' | 'rail' | 'scatter';
+export type WeaponId = 'plasma' | 'rail' | 'scatter' | 'launcher';
 
 export type WeaponDef = {
   id: WeaponId;
@@ -14,9 +14,11 @@ export type WeaponDef = {
   spread: number;
   pierce: number;
   desc: string;
+  /** Radial impact blast radius; 0 = single-target projectile. */
+  aoeRadius?: number;
 };
 
-export const WEAPON_ORDER: WeaponId[] = ['plasma', 'rail', 'scatter'];
+export const WEAPON_ORDER: WeaponId[] = ['plasma', 'rail', 'scatter', 'launcher'];
 
 export const WEAPON_DEFS: Record<WeaponId, WeaponDef> = {
   plasma: {
@@ -60,6 +62,21 @@ export const WEAPON_DEFS: Record<WeaponId, WeaponDef> = {
     spread: 0.22,
     pierce: 0,
     desc: 'Close burst · multi-pellet',
+  },
+  launcher: {
+    id: 'launcher',
+    name: 'Ion Launcher',
+    short: 'ION',
+    color: '#4ade80',
+    fireInterval: 0.72,
+    heatPerShot: 16,
+    damage: 26,
+    projectileSpeed: 14,
+    pellets: 1,
+    spread: 0,
+    pierce: 0,
+    desc: 'Slow ion bolt · impact blast',
+    aoeRadius: 2.55,
   },
 };
 

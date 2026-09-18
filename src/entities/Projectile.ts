@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export type ProjectileOwner = 'player' | 'enemy';
-export type ProjectileStyle = 'plasma' | 'rail' | 'scatter' | 'enemy';
+export type ProjectileStyle = 'plasma' | 'rail' | 'scatter' | 'launcher' | 'enemy';
 
 /** Visual + hitbox profile per weapon so shots read differently at a glance. */
 const STYLE_PROFILES: Record<
@@ -38,6 +38,14 @@ const STYLE_PROFILES: Record<
     trailOpacity: 0.4,
     radius: 0.11,
   },
+  // Heavy ion warhead — fat core + short stubby trail
+  launcher: {
+    coreScale: [1.7, 1.7, 1.35],
+    trailScale: [1.15, 1.15, 0.9],
+    trailOffsetZ: 0.38,
+    trailOpacity: 0.55,
+    radius: 0.22,
+  },
   // Enemy shots — larger violet orb
   enemy: {
     coreScale: [1.4, 1.4, 1.35],
@@ -59,6 +67,8 @@ export class Projectile {
   pierce = 0;
   crit = false;
   sourceWeapon: string | null = null;
+  /** Radial blast on impact; 0 = no explosion. */
+  aoeRadius = 0;
   /** Targets already damaged by this projectile (prevents pierce re-hits). */
   readonly hitSet = new Set<string>();
   /** How many targets this projectile has already damaged. */
@@ -95,7 +105,12 @@ export class Projectile {
     damage: number,
     owner: ProjectileOwner,
     color: string,
-    extras?: { pierce?: number; crit?: boolean; sourceWeapon?: string | null },
+    extras?: {
+      pierce?: number;
+      crit?: boolean;
+      sourceWeapon?: string | null;
+      aoeRadius?: number;
+    },
   ): void {
     const weapon = extras?.sourceWeapon;
     const style: ProjectileStyle =
@@ -105,16 +120,19 @@ export class Projectile {
           ? 'rail'
           : weapon === 'scatter'
             ? 'scatter'
-            : 'plasma';
+            : weapon === 'launcher'
+              ? 'launcher'
+              : 'plasma';
     const profile = STYLE_PROFILES[style];
 
     this.active = true;
-    this.life = style === 'rail' ? 2.6 : 2.2;
+    this.life = style === 'rail' ? 2.6 : style === 'launcher' ? 2.8 : 2.2;
     this.damage = damage;
     this.owner = owner;
     this.pierce = extras?.pierce ?? 0;
     this.crit = extras?.crit ?? false;
     this.sourceWeapon = weapon ?? null;
+    this.aoeRadius = extras?.aoeRadius ?? 0;
     this.hitSet.clear();
     this.hitsLanded = 0;
     this.group.visible = true;
@@ -183,7 +201,12 @@ export class ProjectilePool {
     damage: number,
     owner: ProjectileOwner,
     color: string,
-    extras?: { pierce?: number; crit?: boolean; sourceWeapon?: string | null },
+    extras?: {
+      pierce?: number;
+      crit?: boolean;
+      sourceWeapon?: string | null;
+      aoeRadius?: number;
+    },
   ): Projectile | null {
     for (const p of this.projectiles) {
       if (!p.active) {

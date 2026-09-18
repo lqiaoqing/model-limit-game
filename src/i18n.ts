@@ -73,9 +73,11 @@ type Dict = {
   weaponPlasma: string;
   weaponRail: string;
   weaponScatter: string;
+  weaponLauncher: string;
   weaponPlasmaShort: string;
   weaponRailShort: string;
   weaponScatterShort: string;
+  weaponLauncherShort: string;
   // boss phases
   phaseSweep: string;
   phaseLockdown: string;
@@ -148,9 +150,11 @@ const zh: Dict = {
   weaponPlasma: '等离子连发',
   weaponRail: '轨道炮',
   weaponScatter: '霰弹枪',
+  weaponLauncher: '离子发射器',
   weaponPlasmaShort: '等离子',
   weaponRailShort: '轨道',
   weaponScatterShort: '霰弹',
+  weaponLauncherShort: '离子',
   phaseSweep: '横扫',
   phaseLockdown: '封锁',
   phaseOverdrive: '过载',
@@ -238,9 +242,11 @@ const en: Dict = {
   weaponPlasma: 'Plasma Repeater',
   weaponRail: 'Railgun',
   weaponScatter: 'Scattergun',
+  weaponLauncher: 'Ion Launcher',
   weaponPlasmaShort: 'PLS',
   weaponRailShort: 'RAIL',
   weaponScatterShort: 'SCT',
+  weaponLauncherShort: 'ION',
   phaseSweep: 'SWEEP',
   phaseLockdown: 'LOCKDOWN',
   phaseOverdrive: 'OVERDRIVE',
@@ -325,12 +331,14 @@ export function bossPhaseName(id: number): string {
 export function weaponName(id: string): string {
   if (id === 'rail') return t().weaponRail;
   if (id === 'scatter') return t().weaponScatter;
+  if (id === 'launcher') return t().weaponLauncher;
   return t().weaponPlasma;
 }
 
 export function weaponShort(id: string): string {
   if (id === 'rail') return t().weaponRailShort;
   if (id === 'scatter') return t().weaponScatterShort;
+  if (id === 'launcher') return t().weaponLauncherShort;
   return t().weaponPlasmaShort;
 }
 
@@ -358,6 +366,7 @@ export function applyStaticLocale(): void {
     'weapon.plasma': dict.weaponPlasmaShort,
     'weapon.rail': dict.weaponRailShort,
     'weapon.scatter': dict.weaponScatterShort,
+    'weapon.launcher': dict.weaponLauncherShort,
   };
   for (const [key, value] of Object.entries(map)) {
     document.querySelectorAll<HTMLElement>(`[data-i18n="${key}"]`).forEach((el) => {
@@ -369,6 +378,7 @@ export function applyStaticLocale(): void {
     plasma: `${dict.weaponPlasma} — 1`,
     rail: `${dict.weaponRail} — 2`,
     scatter: `${dict.weaponScatter} — 3`,
+    launcher: `${dict.weaponLauncher} — 4`,
   };
   document.querySelectorAll<HTMLElement>('.weapon-chip').forEach((chip) => {
     const id = chip.dataset.weapon ?? 'plasma';
