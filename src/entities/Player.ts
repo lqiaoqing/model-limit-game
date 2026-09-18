@@ -636,7 +636,7 @@ export class Player {
       this.heat = Math.max(0, this.heat - this.stats.overheatLockPerSec * delta);
       if (this.heat <= 0) this.overheated = false;
     } else {
-      this.heat = Math.max(0, this.heat - this.stats.heatCoolPerSec * delta);
+      this.heat = Math.max(0, this.heat - this.stats.heatCoolPerSec * this.heatCoolMul * delta);
     }
 
     // Offset muzzle matches left cannon
@@ -690,9 +690,11 @@ export class Player {
     if (this.heat < this.stats.maxHeat * 0.35) this.overheated = false;
   }
 
-  /** Temporary combat-rule multipliers (dash reload / momentum). */
+  /** Temporary combat-rule multipliers (dash reload / momentum / disruptor). */
   fireIntervalMul = 1;
   moveSpeedMul = 1;
+  /** Soft control: multiplies heat cooling rate (1 = normal). */
+  heatCoolMul = 1;
 
   takeDamage(amount: number): { hit: boolean; shieldBroke: boolean } {
     if (!this.alive || this.invulnTimer > 0) return { hit: false, shieldBroke: false };

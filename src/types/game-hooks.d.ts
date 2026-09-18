@@ -17,12 +17,25 @@ declare global {
         z?: number,
       ) => { ok: boolean; enemies: number };
       getEnemies?: () => Array<{
+        id?: string;
         kind: string;
         x: number;
         z: number;
         hp: number;
         alive: boolean;
       }>;
+      clearEnemies?: () => { ok: boolean; enemies: number };
+      debugHitEnemy?: (
+        id: string,
+        damage: number,
+        fromX?: number,
+        fromZ?: number,
+      ) => { ok: boolean; hp: number; alive: boolean; kind?: string };
+      getPlayerSoftControl?: () => {
+        moveSpeedMul: number;
+        heatCoolMul: number;
+        disruptTimer: number;
+      };
       getBuildSnapshot?: () => {
         weapon: string;
         fireInterval: number;

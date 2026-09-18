@@ -231,7 +231,7 @@ export class CombatSystem {
       const playerMul = this.deps.getPlayerDamageMul?.() ?? 1;
       if (playerMul !== 1) dmg *= playerMul;
       if (this.deps.getEnemyOneHp?.()) dmg = Math.max(dmg, 999999);
-      const died = enemy.takeDamage(dmg);
+      const died = enemy.takeDamage(dmg, pos);
       totalDamage += dmg;
       onDamageDealt?.(dmg, 'launcher');
       vfx.spawnBurst(enemy.group.position.clone().setY(0.4), '#4ade80', 7, 4.5);
@@ -374,7 +374,7 @@ export class CombatSystem {
               dmg *= RAIL_EXECUTE_DMG_MUL;
             }
             p.hitsLanded += 1;
-            const died = enemy.takeDamage(dmg);
+            const died = enemy.takeDamage(dmg, player.group.position);
             this.deps.onDamageDealt?.(dmg, p.sourceWeapon);
             audio.hit();
             vfx.spawnBurst(pos, p.crit ? '#fbbf24' : enemy.stats.color, p.crit ? 10 : 6, 5);

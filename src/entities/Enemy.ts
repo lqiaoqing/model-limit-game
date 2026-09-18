@@ -1,7 +1,16 @@
 import * as THREE from 'three';
 import { getEnemyAssets } from '../systems/EnemyAssets';
 
-export type EnemyKind = 'chaser' | 'ranged' | 'elite' | 'boss';
+export type EnemyKind =
+  | 'chaser'
+  | 'ranged'
+  | 'elite'
+  | 'swarm'
+  | 'bomber'
+  | 'bulwark'
+  | 'sniper'
+  | 'disruptor'
+  | 'boss';
 export type EnemyFormTier = 0 | 1 | 2 | 3;
 
 export type EnemyStats = {
@@ -17,6 +26,13 @@ export type EnemyStats = {
   color: string;
   emissive: string;
   scale: number;
+};
+
+export type PendingExplosion = {
+  radius: number;
+  damage: number;
+  /** Damages other enemies (and the player unless passive debug). */
+  friendlyFire: boolean;
 };
 
 export const ENEMY_TEMPLATES: Record<EnemyKind, EnemyStats> = {
@@ -48,6 +64,20 @@ export const ENEMY_TEMPLATES: Record<EnemyKind, EnemyStats> = {
     emissive: '#4c1d95',
     scale: 1,
   },
+  swarm: {
+    kind: 'swarm',
+    hp: 10,
+    speed: 4.2,
+    radius: 0.28,
+    contactDamage: 4,
+    projectileDamage: 0,
+    fireInterval: 0,
+    projectileSpeed: 0,
+    score: 40,
+    color: '#f43f5e',
+    emissive: '#9f1239',
+    scale: 0.72,
+  },
   elite: {
     kind: 'elite',
     hp: 90,
@@ -61,6 +91,62 @@ export const ENEMY_TEMPLATES: Record<EnemyKind, EnemyStats> = {
     color: '#f59e0b',
     emissive: '#92400e',
     scale: 1.2,
+  },
+  bomber: {
+    kind: 'bomber',
+    hp: 34,
+    speed: 2.6,
+    radius: 0.5,
+    contactDamage: 6,
+    projectileDamage: 0,
+    fireInterval: 0,
+    projectileSpeed: 0,
+    score: 220,
+    color: '#fb923c',
+    emissive: '#c2410c',
+    scale: 1.05,
+  },
+  bulwark: {
+    kind: 'bulwark',
+    hp: 120,
+    speed: 1.35,
+    radius: 0.78,
+    contactDamage: 12,
+    projectileDamage: 0,
+    fireInterval: 0,
+    projectileSpeed: 0,
+    score: 320,
+    color: '#64748b',
+    emissive: '#334155',
+    scale: 1.25,
+  },
+  sniper: {
+    kind: 'sniper',
+    hp: 26,
+    speed: 1.6,
+    radius: 0.42,
+    contactDamage: 5,
+    projectileDamage: 22,
+    fireInterval: 2.6,
+    projectileSpeed: 22,
+    score: 280,
+    color: '#22d3ee',
+    emissive: '#0e7490',
+    scale: 0.95,
+  },
+  disruptor: {
+    kind: 'disruptor',
+    hp: 48,
+    speed: 2.0,
+    radius: 0.52,
+    contactDamage: 7,
+    projectileDamage: 8,
+    fireInterval: 1.8,
+    projectileSpeed: 9,
+    score: 300,
+    color: '#c084fc',
+    emissive: '#6b21a8',
+    scale: 1.0,
   },
   boss: {
     kind: 'boss',
@@ -105,11 +191,20 @@ export class Enemy {
   readonly formTier: EnemyFormTier;
   /** Titan phase emissive tint; null keeps template color. */
   bossPhaseColor: string | null = null;
+  /** Bomber fuse countdown; <0 = not armed. */
+  fuseTimer = -1;
+  /** Set when this unit should explode this frame (fuse or death). */
+  pendingExplosion: PendingExplosion | null = null;
+  /** Disruptor pulse request for Game soft-control application. */
+  wantDisruptPulse = false;
+  /** Sniper laser lock remaining (readable telegraph). */
+  lockTimer = 0;
 
   private bossVisual: THREE.Group | null = null;
   private bossRings: THREE.Mesh[] = [];
   private bossCore: THREE.Mesh | null = null;
   private chargeScale = 1;
+  private disruptCycle = 2.2;
 
   constructor(
     readonly stats: EnemyStats,
@@ -222,13 +317,22 @@ export class Enemy {
 
     let moveDir = toPlayer.clone();
     let speed = this.stats.speed * this.moveSpeedMul;
+    this.wantDisruptPulse = false;
 
-    if (this.stats.kind === 'ranged') {
-      const preferred = 6.5;
+    if (this.stats.kind === 'ranged' || this.stats.kind === 'disruptor') {
+      const preferred = this.stats.kind === 'disruptor' ? 5.5 : 6.5;
       if (dist < preferred - 1.2) moveDir.multiplyScalar(-1);
       else if (Math.abs(dist - preferred) < 1.2) {
         moveDir.set(-toPlayer.z, 0, toPlayer.x);
         speed *= 0.7;
+      }
+    } else if (this.stats.kind === 'sniper') {
+      const preferred = 10.5;
+      if (dist < preferred - 2) moveDir.multiplyScalar(-1);
+      else if (dist > preferred + 1.5) moveDir.multiplyScalar(0.85);
+      else {
+        moveDir.set(-toPlayer.z, 0, toPlayer.x).multiplyScalar(0.55);
+        speed *= 0.45;
       }
     } else if (this.stats.kind === 'boss') {
       const preferred = 5;
@@ -245,6 +349,26 @@ export class Enemy {
         this.telegraphTimer = 0;
       }
       if (this.lungeTimer > 0) speed = this.stats.speed * 2.4;
+    } else if (this.stats.kind === 'swarm') {
+      // Lightweight flood: pure chase, no lunge bookkeeping.
+      speed *= 1 + Math.sin(elapsed * 6 + this.seedPhase * 9) * 0.08;
+    } else if (this.stats.kind === 'bulwark') {
+      // Slow advance; faces the player for frontal plate.
+      speed *= 0.95;
+    } else if (this.stats.kind === 'bomber') {
+      if (dist < 2.9 && this.fuseTimer < 0) {
+        this.fuseTimer = 1.2;
+      }
+      if (this.fuseTimer >= 0) {
+        this.fuseTimer -= delta;
+        this.telegraphTimer = 0.08;
+        speed *= 0.35;
+        if (this.fuseTimer <= 0) {
+          this.alive = false;
+          this.group.visible = false;
+          this.pendingExplosion = { radius: 3.3, damage: 24, friendlyFire: true };
+        }
+      }
     } else if (this.stats.kind === 'elite') {
       if (dist < 3) moveDir.multiplyScalar(0.4);
     }
@@ -263,7 +387,12 @@ export class Enemy {
     );
     this.group.rotation.y = Math.atan2(toPlayer.x, toPlayer.z);
 
-    if (this.stats.kind === 'ranged' || this.stats.kind === 'boss') {
+    if (
+      this.stats.kind === 'ranged' ||
+      this.stats.kind === 'boss' ||
+      this.stats.kind === 'sniper' ||
+      this.stats.kind === 'disruptor'
+    ) {
       this.group.position.y = 0.08 + Math.sin(elapsed * 3 + this.seedPhase * 5) * 0.05;
     } else {
       this.group.position.y = Math.abs(Math.sin(elapsed * 8 + this.seedPhase * 3)) * 0.025;
@@ -273,12 +402,36 @@ export class Enemy {
       this.chargeScale = 0.85 + THREE.MathUtils.clamp(1 - this.fireTimer / this.stats.fireInterval, 0, 1) * 0.55;
     }
 
-    if (this.stats.fireInterval > 0) {
+    if (this.stats.kind === 'sniper') {
+      // Lock window is the last stretch of the fire cycle — never silent.
+      if (this.stats.fireInterval > 0) {
+        const lockWindow = 0.7;
+        this.lockTimer = this.fireTimer > 0 && this.fireTimer < lockWindow ? this.fireTimer : 0;
+        if (this.lockTimer > 0) this.telegraphTimer = Math.max(this.telegraphTimer, this.lockTimer);
+      }
+    }
+
+    if (this.stats.kind === 'disruptor') {
+      this.disruptCycle -= delta;
+      if (this.disruptCycle <= 0 && dist < 7.5) {
+        this.wantDisruptPulse = true;
+        this.disruptCycle = 3.4;
+        this.telegraphTimer = Math.max(this.telegraphTimer, 0.35);
+      }
+    }
+
+    if (this.stats.fireInterval > 0 && this.stats.kind !== 'bomber') {
       const interval = Math.max(0.08, this.stats.fireInterval * this.fireIntervalMul);
       this.fireTimer -= delta;
       if (this.fireTimer <= 0) {
         this.fireTimer = interval;
-        this.wantShoot = true;
+        // Sniper must complete a visible lock before the shot lands.
+        if (this.stats.kind === 'sniper' && this.telegraphTimer > 0.05 && this.lockTimer > 0.05) {
+          // Defer one tick while lock still visible — keep wantShoot false.
+          this.fireTimer = 0.08;
+        } else {
+          this.wantShoot = true;
+        }
       }
     }
   }
@@ -287,13 +440,33 @@ export class Enemy {
     return this.stats.kind === 'ranged' ? this.chargeScale : 1;
   }
 
-  takeDamage(amount: number): boolean {
+  takeDamage(amount: number, fromPos?: THREE.Vector3 | null): boolean {
     if (!this.alive) return false;
-    this.hp -= amount;
+    let dmg = amount;
+    if (this.stats.kind === 'bulwark' && fromPos) {
+      const ax = fromPos.x - this.group.position.x;
+      const az = fromPos.z - this.group.position.z;
+      const len = Math.hypot(ax, az) || 1;
+      const toAttackerX = ax / len;
+      const toAttackerZ = az / len;
+      const facingX = Math.sin(this.group.rotation.y);
+      const facingZ = Math.cos(this.group.rotation.y);
+      const dot = facingX * toAttackerX + facingZ * toAttackerZ;
+      if (dot > 0.35) dmg *= 0.4;
+    }
+    this.hp -= dmg;
     if (this.hp <= 0) {
       this.hp = 0;
       this.alive = false;
       this.group.visible = false;
+      if (this.stats.kind === 'bomber') {
+        // Early kill still detonates — smaller, still friendly-fire capable.
+        this.pendingExplosion = {
+          radius: this.fuseTimer >= 0 ? 2.8 : 2.2,
+          damage: this.fuseTimer >= 0 ? 22 : 16,
+          friendlyFire: true,
+        };
+      }
       return true;
     }
     return false;

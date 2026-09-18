@@ -2,7 +2,16 @@ import * as THREE from 'three';
 import type { Enemy, EnemyKind, EnemyFormTier } from '../entities/Enemy';
 import { getEnemyAssets } from './EnemyAssets';
 
-const BATCH_KINDS: EnemyKind[] = ['chaser', 'ranged', 'elite'];
+const BATCH_KINDS: EnemyKind[] = [
+  'chaser',
+  'ranged',
+  'elite',
+  'swarm',
+  'bomber',
+  'bulwark',
+  'sniper',
+  'disruptor',
+];
 const FORM_TIERS: EnemyFormTier[] = [0, 1, 2, 3];
 
 type Batch = {
@@ -67,7 +76,12 @@ export class EnemyBatchRenderer {
 
       const pos = enemy.group.position;
       const yaw = enemy.group.rotation.y;
-      const kindScale = enemy.stats.kind === 'elite' ? enemy.stats.scale : 1;
+      const kindScale =
+        enemy.stats.kind === 'elite' || enemy.stats.kind === 'bulwark'
+          ? enemy.stats.scale
+          : enemy.stats.kind === 'swarm'
+            ? 0.72
+            : 1;
       const formScale = 1 + enemy.formTier * 0.04;
       const scale = kindScale * formScale;
 

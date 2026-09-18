@@ -134,6 +134,65 @@ function eliteEmissive(tier: EnemyFormTier): string {
   return ['#92400e', '#c2410c', '#b45309', '#a16207'][tier] ?? '#92400e';
 }
 
+function makeSwarm(tier: EnemyFormTier): SharedEnemyAssets {
+  const shell = new THREE.OctahedronGeometry(0.22 + tier * 0.02, 0);
+  shell.translate(0, 0.28, 0);
+  const glow = new THREE.SphereGeometry(0.08 + tier * 0.01, 6, 4);
+  glow.translate(0, 0.3, 0);
+  return pack('swarm', shell, glow, '#f43f5e', '#9f1239', 0.28);
+}
+
+function makeBomber(tier: EnemyFormTier): SharedEnemyAssets {
+  const shell = new THREE.SphereGeometry(0.4 + tier * 0.04, 10, 8);
+  shell.translate(0, 0.42, 0);
+  const glow = new THREE.SphereGeometry(0.18 + tier * 0.02, 8, 6);
+  glow.translate(0, 0.42, 0);
+  return pack('bomber', shell, glow, '#fb923c', '#c2410c', 0.5);
+}
+
+function makeBulwark(tier: EnemyFormTier): SharedEnemyAssets {
+  const parts: THREE.BufferGeometry[] = [];
+  const body = new THREE.BoxGeometry(0.9 + tier * 0.06, 0.7, 0.7);
+  body.translate(0, 0.55, 0);
+  parts.push(body);
+  const plate = new THREE.BoxGeometry(0.95 + tier * 0.05, 0.55, 0.12);
+  plate.translate(0, 0.55, 0.42);
+  parts.push(plate);
+  const shell = mergeGeos(parts);
+  const glow = new THREE.BoxGeometry(0.2, 0.2, 0.08);
+  glow.translate(0, 0.7, 0.5);
+  return pack('bulwark', shell, glow, '#64748b', '#334155', 0.78);
+}
+
+function makeSniper(tier: EnemyFormTier): SharedEnemyAssets {
+  const parts: THREE.BufferGeometry[] = [];
+  const body = new THREE.CylinderGeometry(0.16, 0.22, 0.55 + tier * 0.04, 6);
+  body.translate(0, 0.45, 0);
+  parts.push(body);
+  const barrel = new THREE.BoxGeometry(0.08, 0.08, 0.7 + tier * 0.06);
+  barrel.translate(0, 0.55, 0.35);
+  parts.push(barrel);
+  const shell = mergeGeos(parts);
+  const glow = new THREE.SphereGeometry(0.1 + tier * 0.02, 6, 5);
+  glow.translate(0, 0.72, 0.1);
+  return pack('sniper', shell, glow, '#22d3ee', '#0e7490', 0.42);
+}
+
+function makeDisruptor(tier: EnemyFormTier): SharedEnemyAssets {
+  const parts: THREE.BufferGeometry[] = [];
+  const core = new THREE.IcosahedronGeometry(0.32 + tier * 0.03, 0);
+  core.translate(0, 0.5, 0);
+  parts.push(core);
+  const ring = new THREE.TorusGeometry(0.42 + tier * 0.03, 0.04, 5, 16);
+  ring.rotateX(Math.PI / 2);
+  ring.translate(0, 0.5, 0);
+  parts.push(ring);
+  const shell = mergeGeos(parts);
+  const glow = new THREE.OctahedronGeometry(0.16 + tier * 0.02, 0);
+  glow.translate(0, 0.55, 0);
+  return pack('disruptor', shell, glow, '#c084fc', '#6b21a8', 0.52);
+}
+
 function makeBoss(_tier: EnemyFormTier): SharedEnemyAssets {
   const shell = new THREE.IcosahedronGeometry(0.72, 0);
   shell.translate(0, 1.0, 0);
@@ -218,6 +277,11 @@ export function getEnemyAssets(kind: EnemyKind, tier: EnemyFormTier = 0): Shared
   if (kind === 'chaser') assets = makeChaser(tier);
   else if (kind === 'ranged') assets = makeRanged(tier);
   else if (kind === 'elite') assets = makeElite(tier);
+  else if (kind === 'swarm') assets = makeSwarm(tier);
+  else if (kind === 'bomber') assets = makeBomber(tier);
+  else if (kind === 'bulwark') assets = makeBulwark(tier);
+  else if (kind === 'sniper') assets = makeSniper(tier);
+  else if (kind === 'disruptor') assets = makeDisruptor(tier);
   else assets = makeBoss(tier);
   cache.set(key, assets);
   return assets;

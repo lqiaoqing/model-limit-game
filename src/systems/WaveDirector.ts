@@ -190,14 +190,32 @@ export class WaveDirector {
     this.spawnEnemyAt(kind, x, z);
   }
 
-  listEnemies(): Array<{ kind: string; x: number; z: number; hp: number; alive: boolean }> {
+  listEnemies(): Array<{
+    id: string;
+    kind: string;
+    x: number;
+    z: number;
+    hp: number;
+    alive: boolean;
+  }> {
     return this.enemies.map((e) => ({
+      id: e.group.uuid,
       kind: e.stats.kind,
       x: e.group.position.x,
       z: e.group.position.z,
       hp: e.hp,
       alive: e.alive,
     }));
+  }
+
+  /** Test-only: remove every live enemy immediately. */
+  clearEnemies(): void {
+    for (const e of this.enemies) {
+      this.scene.remove(e.group);
+      e.dispose();
+    }
+    this.enemies.length = 0;
+    this.spawnQueue = [];
   }
 
   private spawnFromTicket(ticket: SpawnTicket, playerPos: THREE.Vector3): void {

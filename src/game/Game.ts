@@ -55,6 +55,11 @@ const CONTACT_KNOCKBACK: Record<string, number> = {
   chaser: 12,
   ranged: 10,
   elite: 7,
+  swarm: 14,
+  bomber: 10,
+  bulwark: 4,
+  sniper: 9,
+  disruptor: 8,
   boss: 2.8,
 };
 
@@ -136,6 +141,9 @@ export class Game {
   private reducedMotion = false;
   private lastWaveShown = 0;
   private emergencyUsed = false;
+  private disruptMoveMul = 1;
+  private disruptHeatMul = 1;
+  private disruptTimer = 0;
   private lastEnemyFormTier = 0;
   private fpsAccum = 0;
   private fpsFrames = 0;
@@ -459,8 +467,16 @@ export class Game {
 
     const moveLen = this.inputFrame.move.length();
     this.combat.tickRuleRuntime(delta, moveLen > 0.08);
+    if (this.disruptTimer > 0) {
+      this.disruptTimer = Math.max(0, this.disruptTimer - delta);
+      if (this.disruptTimer <= 0) {
+        this.disruptMoveMul = 1;
+        this.disruptHeatMul = 1;
+      }
+    }
     this.player.fireIntervalMul = this.combat.getFireIntervalMul();
-    this.player.moveSpeedMul = this.combat.getMoveSpeedMul();
+    this.player.moveSpeedMul = this.combat.getMoveSpeedMul() * this.disruptMoveMul;
+    this.player.heatCoolMul = this.disruptHeatMul;
 
     if (this.player.overheatPulse) {
       this.combat.castOverheatEmp();
@@ -577,6 +593,14 @@ export class Game {
         cover.resolveEntity(enemy.group.position, enemy.radius);
       }
 
+      if (enemy.wantDisruptPulse && !this.debugFlags.enemyPassive) {
+        this.disruptMoveMul = 0.72;
+        this.disruptHeatMul = 0.45;
+        this.disruptTimer = 1.6;
+        this.vfx.spawnBurst(enemy.group.position.clone().setY(0.5), '#c084fc', 8, 3.5);
+        this.worldFx.triggerPulse(enemy.group.position, '#c084fc', 4.2);
+      }
+
       if (enemy.wantShoot && enemy.stats.fireInterval > 0 && !this.debugFlags.enemyPassive) {
         const origin = enemy.group.position.clone().setY(0.55);
         const dir = new THREE.Vector3(
@@ -601,6 +625,24 @@ export class Game {
               phase.color,
             );
           }
+        } else if (enemy.stats.kind === 'sniper') {
+          this.projectiles.spawn(
+            origin,
+            dir,
+            enemy.stats.projectileSpeed,
+            enemy.stats.projectileDamage,
+            'enemy',
+            '#22d3ee',
+          );
+        } else if (enemy.stats.kind === 'disruptor') {
+          this.projectiles.spawn(
+            origin,
+            dir,
+            enemy.stats.projectileSpeed,
+            enemy.stats.projectileDamage,
+            'enemy',
+            '#c084fc',
+          );
         } else {
           this.projectiles.spawn(
             origin,
@@ -614,6 +656,7 @@ export class Game {
       }
     }
 
+    this.resolvePendingExplosions();
     this.tickBossLogic(delta);
     this.projectiles.update(delta);
     this.combat.resolveProjectileHits(ARENA, this.covers);
@@ -892,6 +935,42 @@ export class Game {
     this.vfx.spawnBurst(enemy.group.position.clone().setY(0.8), result.phase.color, 22, 8);
   }
 
+  private resolvePendingExplosions(): void {
+    for (const enemy of this.waves.enemies) {
+      const exp = enemy.pendingExplosion;
+      if (!exp) continue;
+      enemy.pendingExplosion = null;
+      const pos = enemy.group.position.clone();
+      this.vfx.spawnShockwave(pos, '#fb923c', exp.radius * 0.8);
+      this.worldFx.triggerPulse(pos, '#fb923c', exp.radius);
+      this.decals.spawnScorch(pos);
+      if (exp.friendlyFire) {
+        for (const other of this.waves.enemies) {
+          if (!other.alive || other === enemy) continue;
+          const dx = other.group.position.x - pos.x;
+          const dz = other.group.position.z - pos.z;
+          if (dx * dx + dz * dz > exp.radius * exp.radius) continue;
+          const died = other.takeDamage(exp.damage, pos);
+          this.vfx.spawnBurst(other.group.position.clone().setY(0.4), '#fb923c', 6, 4);
+          if (died) this.onEnemyKilled(other, { sourceWeapon: 'bomber', damage: exp.damage });
+        }
+      }
+      if (!this.debugFlags.enemyPassive && this.player.alive) {
+        const dx = this.player.group.position.x - pos.x;
+        const dz = this.player.group.position.z - pos.z;
+        const rr = 0.55 + exp.radius * 0.25;
+        if (dx * dx + dz * dz <= (exp.radius + rr) * (exp.radius + rr)) {
+          const hurt = this.player.takeDamage(exp.damage);
+          if (hurt.hit) {
+            this.lastDeathCause = 'bomber';
+            this.onPlayerHurt();
+            if (hurt.shieldBroke) this.combat.maybeShieldNova();
+          }
+        }
+      }
+    }
+  }
+
   private tickBossLogic(delta: number): void {
     const boss = this.waves.boss;
     if (!boss) {
@@ -1144,6 +1223,9 @@ export class Game {
     this.lastBossRef = null;
     this.combat.reset();
     this.emergencyUsed = false;
+    this.disruptMoveMul = 1;
+    this.disruptHeatMul = 1;
+    this.disruptTimer = 0;
     this.hud.hideUpgradeCards();
     this.hud.setActiveWeapon('plasma');
     this.feel.reset();
@@ -1969,6 +2051,29 @@ export class Game {
         return { ok: true, enemies: this.waves.enemies.length };
       },
       getEnemies: () => this.waves.listEnemies(),
+      clearEnemies: () => {
+        this.waves.clearEnemies();
+        this.enemyBatch.sync(this.waves.enemies);
+        return { ok: true, enemies: 0 };
+      },
+      debugHitEnemy: (id: string, damage: number, fromX?: number, fromZ?: number) => {
+        const target = this.waves.enemies.find((e) => e.group.uuid === id || e.stats.kind === id);
+        if (!target) return { ok: false, hp: 0, alive: false, kind: '' };
+        const from =
+          typeof fromX === 'number' && typeof fromZ === 'number'
+            ? new THREE.Vector3(fromX, 0, fromZ)
+            : this.player.group.position.clone();
+        const died = target.takeDamage(damage, from);
+        if (died) this.onEnemyKilled(target);
+        this.resolvePendingExplosions();
+        this.enemyBatch.sync(this.waves.enemies);
+        return { ok: true, hp: target.hp, alive: target.alive, kind: target.stats.kind };
+      },
+      getPlayerSoftControl: () => ({
+        moveSpeedMul: this.player.moveSpeedMul,
+        heatCoolMul: this.player.heatCoolMul,
+        disruptTimer: this.disruptTimer,
+      }),
       getBuildSnapshot: () => {
         const resolved = resolveWeaponStats(this.combatBuild, this.weapon);
         const perWeaponDamage: Record<string, number> = {};

@@ -1,11 +1,14 @@
 import type { EnemyKind } from '../entities/Enemy';
+import { ENEMY_ARCHETYPES, isUnlocked } from './EnemyArchetypes';
 
 export type SquadRecipeId =
   | 'hunter_pack'
   | 'artillery_nest'
   | 'shield_wall'
   | 'assassin_strike'
-  | 'suppression';
+  | 'suppression'
+  | 'bomb_rush'
+  | 'disruptor_escort';
 
 export type SpawnAnchor = 'north' | 'south' | 'east' | 'west' | 'center';
 
@@ -28,6 +31,8 @@ export type SquadRecipe = {
   mix: Partial<Record<EnemyKind, number>>;
   /** Preferred formation anchors for this squad. */
   anchors: SpawnAnchor[];
+  /** Minimum wave for this squad recipe. */
+  unlockWave: number;
 };
 
 export const SQUAD_RECIPES: SquadRecipe[] = [
@@ -35,24 +40,27 @@ export const SQUAD_RECIPES: SquadRecipe[] = [
     id: 'hunter_pack',
     name: 'HUNTER PACK',
     threat: 8,
-    mix: { chaser: 6 },
+    mix: { chaser: 4, swarm: 3 },
     // Same-side pressure: pack from one flank.
     anchors: ['east', 'west'],
+    unlockWave: 1,
   },
   {
     id: 'artillery_nest',
     name: 'ARTILLERY NEST',
-    threat: 10,
-    mix: { ranged: 4 },
+    threat: 12,
+    mix: { ranged: 3, sniper: 1 },
     // Rear nest: hold far side and shell.
     anchors: ['north', 'south'],
+    unlockWave: 2,
   },
   {
     id: 'shield_wall',
     name: 'SHIELD WALL',
-    threat: 12,
-    mix: { elite: 2, chaser: 4 },
+    threat: 14,
+    mix: { bulwark: 2, ranged: 2 },
     anchors: ['north', 'south'],
+    unlockWave: 6,
   },
   {
     id: 'assassin_strike',
@@ -61,13 +69,31 @@ export const SQUAD_RECIPES: SquadRecipe[] = [
     mix: { elite: 2 },
     // Dual flank pincer.
     anchors: ['east', 'west'],
+    unlockWave: 4,
   },
   {
     id: 'suppression',
     name: 'SUPPRESSION',
     threat: 12,
-    mix: { ranged: 3, chaser: 5 },
+    mix: { chaser: 4, sniper: 1, ranged: 2 },
     anchors: ['north', 'south', 'east'],
+    unlockWave: 3,
+  },
+  {
+    id: 'bomb_rush',
+    name: 'BOMB RUSH',
+    threat: 10,
+    mix: { bomber: 3, swarm: 4 },
+    anchors: ['east', 'west', 'south'],
+    unlockWave: 4,
+  },
+  {
+    id: 'disruptor_escort',
+    name: 'DISRUPTOR ESCORT',
+    threat: 13,
+    mix: { disruptor: 1, bulwark: 1, chaser: 3 },
+    anchors: ['north', 'south', 'center'],
+    unlockWave: 8,
   },
 ];
 
@@ -104,13 +130,12 @@ function formationOffsets(
   rng: () => number,
 ): { offsetX: number; offsetZ: number; delay: number } {
   // Compact line/arc along the edge, with staggered delay so squads read as groups.
-  const spacing = kind === 'ranged' ? 1.1 : 0.85;
+  const spacing = kind === 'ranged' || kind === 'sniper' ? 1.1 : 0.85;
   const mid = (total - 1) / 2;
   const along = (index - mid) * spacing;
   const jitter = () => (rng() - 0.5) * 0.35;
 
   if (squadId === 'assassin_strike') {
-    // Deep offset toward center for a strike pair.
     return {
       offsetX: along * 0.4 + jitter(),
       offsetZ: (index === 0 ? 1.8 : -1.8) + jitter(),
@@ -118,7 +143,6 @@ function formationOffsets(
     };
   }
   if (squadId === 'artillery_nest') {
-    // Clustered rear arc.
     return {
       offsetX: along,
       offsetZ: 0.6 + Math.abs(along) * 0.15 + jitter(),
@@ -126,16 +150,26 @@ function formationOffsets(
     };
   }
   if (squadId === 'shield_wall') {
-    // Elites lead slightly forward.
-    const lead = kind === 'elite' ? 0.9 : 0.2;
+    const lead = kind === 'bulwark' ? 0.9 : 0.2;
     return { offsetX: along, offsetZ: lead + jitter(), delay: 0.05 + index * 0.06 };
   }
   if (squadId === 'hunter_pack') {
     return { offsetX: along * 0.7 + jitter(), offsetZ: 0.4 + (index % 2) * 0.5, delay: index * 0.05 };
   }
   if (squadId === 'suppression') {
-    const depth = kind === 'ranged' ? 1.4 : 0.3;
+    const depth = kind === 'ranged' || kind === 'sniper' ? 1.4 : 0.3;
     return { offsetX: along, offsetZ: depth + jitter(), delay: 0.08 + index * 0.07 };
+  }
+  if (squadId === 'bomb_rush') {
+    return {
+      offsetX: along * 0.6 + jitter(),
+      offsetZ: 0.2 + (kind === 'bomber' ? 0.4 : 0),
+      delay: index * 0.06,
+    };
+  }
+  if (squadId === 'disruptor_escort') {
+    const depth = kind === 'disruptor' ? 0 : kind === 'bulwark' ? 0.7 : 0.25;
+    return { offsetX: along, offsetZ: depth + jitter(), delay: 0.1 + index * 0.08 };
   }
   return { offsetX: along * 0.5 + jitter(), offsetZ: jitter(), delay: index * 0.04 };
 }
@@ -167,9 +201,12 @@ export function composeWaveTickets(options: {
         delay: 0,
       });
     }
+    // Stress stays chaser-heavy so the flood remains a lethal ceiling test.
+    const floodKinds: EnemyKind[] = ['chaser', 'chaser', 'chaser', 'chaser', 'chaser', 'swarm'];
     for (let i = 0; i < countBase + 200; i += 1) {
+      const kind = floodKinds[i % floodKinds.length];
       tickets.push({
-        kind: 'chaser',
+        kind,
         squadId: 'stress',
         anchor: 'center',
         offsetX: 0,
@@ -183,14 +220,7 @@ export function composeWaveTickets(options: {
   let budget = threatBudgetForWave(wave, false);
   if (bossWave) budget = Math.max(10, Math.floor(budget * 0.55));
 
-  const unlocked = SQUAD_RECIPES.filter((recipe) => {
-    if (recipe.id === 'hunter_pack') return wave >= 1;
-    if (recipe.id === 'artillery_nest') return wave >= 2;
-    if (recipe.id === 'shield_wall') return wave >= 4;
-    if (recipe.id === 'assassin_strike') return wave >= 4;
-    if (recipe.id === 'suppression') return wave >= 3;
-    return true;
-  });
+  const unlocked = SQUAD_RECIPES.filter((recipe) => wave >= recipe.unlockWave);
 
   const tickets: SpawnTicket[] = [];
   const squads: SquadRecipeId[] = [];
@@ -215,8 +245,8 @@ export function composeWaveTickets(options: {
     budget -= pick.threat;
     squads.push(pick.id);
 
-    // Assassin: force dual anchors (pincer). Others: one shared anchor.
-    const useDual = pick.id === 'assassin_strike';
+    // Assassin / disruptor escort: force dual anchors. Others: one shared anchor.
+    const useDual = pick.id === 'assassin_strike' || pick.id === 'disruptor_escort';
     const anchorA = pick.anchors[Math.floor(rng() * pick.anchors.length)];
     const anchorB = pick.anchors.find((a) => a !== anchorA) ?? anchorA;
 
@@ -226,7 +256,7 @@ export function composeWaveTickets(options: {
     }
 
     members.forEach((kind, index) => {
-      const anchor = useDual ? (index % 2 === 0 ? anchorA : anchorB) : anchorA;
+      const anchor = useDual && kind !== 'disruptor' ? (index % 2 === 0 ? anchorA : anchorB) : anchorA;
       const form = formationOffsets(pick.id, kind, index, members.length, rng);
       const base = anchorWorld(anchor, halfWidth, halfDepth);
       tickets.push({
@@ -247,8 +277,14 @@ export function composeWaveTickets(options: {
   for (let i = 0; i < fillerBase; i += 1) {
     const r = rng();
     let kind: EnemyKind = 'chaser';
-    if (wave >= 2 && r < 0.32) kind = 'ranged';
-    else if (wave >= 4 && r < 0.48) kind = 'elite';
+    // Weighted filler among unlocked normal archetypes.
+    const unlockedKinds = (
+      ['chaser', 'ranged', 'swarm', 'elite', 'bomber', 'bulwark', 'sniper', 'disruptor'] as const
+    ).filter((k) => isUnlocked(k, wave));
+    if (unlockedKinds.length > 0) {
+      const idx = Math.floor(r * unlockedKinds.length) % unlockedKinds.length;
+      kind = unlockedKinds[idx];
+    }
     const anchor: SpawnAnchor = (['north', 'south', 'east', 'west'] as const)[
       Math.floor(r * 4) % 4
     ];
@@ -284,4 +320,12 @@ export function composeWaveQueue(options: {
     halfDepth: 9,
   });
   return { queue: tickets.map((t) => t.kind), squads };
+}
+
+export function squadThreat(recipeId: SquadRecipeId): number {
+  return SQUAD_RECIPES.find((r) => r.id === recipeId)?.threat ?? 0;
+}
+
+export function archetypeThreat(kind: EnemyKind): number {
+  return ENEMY_ARCHETYPES[kind].threat;
 }

@@ -231,7 +231,7 @@ export class Hud {
     window.setTimeout(() => el.classList.add('hidden'), 420);
   }
 
-  pushKillFeed(text: string, kind: 'chaser' | 'ranged' | 'elite' | 'boss'): void {
+  pushKillFeed(text: string, kind: 'chaser' | 'ranged' | 'elite' | 'boss' | string): void {
     const item = document.createElement('div');
     item.className = `kill-feed-item ${kind}`;
     item.textContent = text;
