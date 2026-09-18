@@ -1,10 +1,10 @@
 {
   "model": "current-v2",
   "challenge": "model-limit-v2",
-  "root": "D:\\Work\\workspace\\model-limit-game",
-  "generatedAt": "2026-09-18T09:01:04.374Z",
-  "total": 0.8883,
-  "total100": 89,
+  "root": "D:\\QWorkspace\\Projects\\Game\\model-limit-game",
+  "generatedAt": "2026-09-18T16:42:37.523Z",
+  "total": 0.9383,
+  "total100": 94,
   "dimensions": {
     "gameplay": {
       "score": 1,
@@ -35,30 +35,34 @@
       "weight": 0.05
     },
     "bugRate": {
-      "score": 0.6,
+      "score": 1,
       "weight": 0.05
     },
     "completion": {
-      "score": 0.4,
+      "score": 1,
       "weight": 0.05
     }
   },
   "checks": {
     "build": {
-      "ran": false,
-      "pass": false,
-      "code": null,
-      "note": "skipped"
+      "ran": true,
+      "pass": true,
+      "status": "PASS",
+      "code": 0,
+      "note": "ok"
     },
     "bot": {
-      "ran": false,
-      "pass": false,
-      "note": "skipped"
+      "ran": true,
+      "pass": true,
+      "status": "PASS",
+      "note": "ok"
     },
     "balance": {
       "ran": false,
       "pass": false,
+      "status": "SKIPPED",
       "note": "skipped",
+      "profile": null,
       "summary": null
     }
   },
@@ -133,7 +137,7 @@
           "id": "game_not_monolith",
           "hit": false,
           "points": 0.5,
-          "note": "src/game/Game.ts lines=2372"
+          "note": "src/game/Game.ts lines=2341"
         }
       ]
     },

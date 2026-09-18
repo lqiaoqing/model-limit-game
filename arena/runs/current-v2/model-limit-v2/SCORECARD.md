@@ -1,9 +1,9 @@
 # Arena Scorecard — current-v2
 
 - Challenge: `model-limit-v2`
-- Root: `D:\Work\workspace\model-limit-game`
-- Generated: 2026-09-18T09:01:04.374Z
-- **Total: 88.8 / 100**
+- Root: `D:\QWorkspace\Projects\Game\model-limit-game`
+- Generated: 2026-09-18T16:42:37.523Z
+- **Total: 93.8 / 100**
 
 ## Dimensions
 
@@ -16,14 +16,15 @@
 | architecture | 83% | 10% | 8.3 |
 | tests | 100% | 10% | 10.0 |
 | mobile | 100% | 5% | 5.0 |
-| bugRate | 60% | 5% | 3.0 |
-| completion | 40% | 5% | 2.0 |
+| bugRate | 100% | 5% | 5.0 |
+| completion | 100% | 5% | 5.0 |
 
 ## Checks
 
-- Build: skipped
-- Bot test: skipped
-- Balance: skipped
+- Build: PASS
+- Bot test: PASS
+- Balance: SKIPPED
+- Balance note: intentionally skipped — use `npm run balance:full` for canonical evidence under `artifacts/balance/full/`.
 
 ## Probe detail
 
@@ -39,7 +40,7 @@
 - x `combat_system` — src/combat/CombatSystem.ts
 - x `telemetry` — src/telemetry/buildDiagnostics.ts
 - x `render_backend` — src/core/RenderBackend.ts
--   `game_not_monolith` — src/game/Game.ts lines=2372
+-   `game_not_monolith` — src/game/Game.ts lines=2341
 
 ### visual (2/2)
 - x `instanced_enemies` — src/systems/EnemyBatchRenderer.ts

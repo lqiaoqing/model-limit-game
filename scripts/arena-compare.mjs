@@ -41,15 +41,21 @@ async function main() {
     const scorePath = path.join(runsDir, ent.name, args.challenge, 'score.json');
     try {
       const raw = JSON.parse(await readFile(scorePath, 'utf8'));
+      const statusOf = (check) => {
+        if (!check) return 'SKIPPED';
+        if (check.status) return check.status;
+        if (!check.ran) return 'SKIPPED';
+        return check.pass ? 'PASS' : 'FAIL';
+      };
       rows.push({
         model: raw.model ?? ent.name,
         id: ent.name,
         total100: raw.total100 ?? Math.round((raw.total ?? 0) * 100),
         generatedAt: raw.generatedAt,
         dimensions: raw.dimensions ?? {},
-        build: raw.checks?.build?.pass,
-        bot: raw.checks?.bot?.pass,
-        balance: raw.checks?.balance?.pass,
+        build: statusOf(raw.checks?.build),
+        bot: statusOf(raw.checks?.bot),
+        balance: statusOf(raw.checks?.balance),
       });
     } catch {
       // no score for this challenge
@@ -78,7 +84,7 @@ async function main() {
   lines.push('| Rank | Model | Total | Build | Bot | Balance |');
   lines.push('|---:|---|---:|:---:|:---:|:---:|');
   rows.forEach((r, i) => {
-    const flag = (v) => (v == null ? '—' : v ? 'PASS' : 'FAIL');
+    const flag = (v) => (v == null ? 'SKIPPED' : v);
     lines.push(
       `| ${i + 1} | ${r.model} | **${r.total100}** | ${flag(r.build)} | ${flag(r.bot)} | ${flag(r.balance)} |`,
     );

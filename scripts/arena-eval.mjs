@@ -221,9 +221,16 @@ async function main() {
   console.log(`Evaluating model=${args.model} challenge=${args.challenge} root=${root}`);
 
   const checks = {
-    build: { ran: false, pass: false, code: null, note: 'skipped' },
-    bot: { ran: false, pass: false, note: 'skipped' },
-    balance: { ran: false, pass: false, note: 'skipped', summary: null },
+    build: { ran: false, pass: false, status: 'SKIPPED', code: null, note: 'skipped' },
+    bot: { ran: false, pass: false, status: 'SKIPPED', note: 'skipped' },
+    balance: {
+      ran: false,
+      pass: false,
+      status: 'SKIPPED',
+      note: 'skipped',
+      profile: null,
+      summary: null,
+    },
   };
 
   if (!args.skipBuild) {
@@ -232,6 +239,7 @@ async function main() {
     checks.build = {
       ran: true,
       pass: build.code === 0,
+      status: build.code === 0 ? 'PASS' : 'FAIL',
       code: build.code,
       note: build.code === 0 ? 'ok' : (build.stderr || build.stdout).slice(-400),
     };
@@ -247,18 +255,22 @@ async function main() {
     checks.bot = {
       ran: true,
       pass: bot.code === 0,
+      status: bot.code === 0 ? 'PASS' : 'FAIL',
       note: bot.code === 0 ? 'ok' : (bot.stdout + bot.stderr).slice(-500),
     };
   }
 
   if (!args.skipBalance) {
-    console.log('→ free port + balance harness (short)');
+    // Short harness profile writes only to artifacts/balance/smoke/ — never overwrites full evidence.
+    console.log('→ free port + balance harness (smoke profile)');
     await freePort(5188);
     await new Promise((r) => setTimeout(r, 400));
     const bal = await run(
       'node',
       [
         'scripts/balance-harness.mjs',
+        '--profile',
+        'smoke',
         '--seeds',
         args.balanceSeeds,
         '--duration',
@@ -269,7 +281,7 @@ async function main() {
     let summary = null;
     try {
       const latest = JSON.parse(
-        await readFile(path.join(root, 'artifacts', 'balance', 'latest.json'), 'utf8'),
+        await readFile(path.join(root, 'artifacts', 'balance', 'smoke', 'latest.json'), 'utf8'),
       );
       summary = latest.aggregate ?? null;
     } catch {
@@ -278,7 +290,9 @@ async function main() {
     checks.balance = {
       ran: true,
       pass: bal.code === 0,
-      note: bal.code === 0 ? 'ok' : (bal.stdout + bal.stderr).slice(-500),
+      status: bal.code === 0 ? 'PASS' : 'FAIL',
+      note: bal.code === 0 ? 'ok (smoke profile)' : (bal.stdout + bal.stderr).slice(-500),
+      profile: 'smoke',
       summary,
     };
   }
@@ -384,9 +398,14 @@ async function main() {
   lines.push('');
   lines.push('## Checks');
   lines.push('');
-  lines.push(`- Build: ${checks.build.ran ? (checks.build.pass ? 'PASS' : 'FAIL') : 'skipped'}`);
-  lines.push(`- Bot test: ${checks.bot.ran ? (checks.bot.pass ? 'PASS' : 'FAIL') : 'skipped'}`);
-  lines.push(`- Balance: ${checks.balance.ran ? (checks.balance.pass ? 'PASS' : 'FAIL') : 'skipped'}`);
+  lines.push(`- Build: ${checks.build.status}`);
+  lines.push(`- Bot test: ${checks.bot.status}`);
+  lines.push(
+    `- Balance: ${checks.balance.status}${checks.balance.profile ? ` (${checks.balance.profile})` : ''}`,
+  );
+  if (checks.balance.status === 'SKIPPED') {
+    lines.push('- Balance note: intentionally skipped — use `npm run balance:full` for canonical evidence under `artifacts/balance/full/`.');
+  }
   if (checks.balance.summary?.weaponRows) {
     lines.push('');
     lines.push('| Weapon | DPS avg | FPS p95 |');
