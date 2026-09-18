@@ -236,9 +236,9 @@ export class CombatSystem {
       if (enemy.stats.kind === 'boss') {
         dmg *= this.deps.getBossDamageMul?.() ?? 1;
       }
-      const died = enemy.takeDamage(dmg, pos);
+      const died = enemy.takeDamage(dmg);
       totalDamage += dmg;
-      onDamageDealt?.(dmg, 'launcher');
+      onDamageDealt?.(dmg, 'ion_impact');
       vfx.spawnBurst(enemy.group.position.clone().setY(0.4), '#4ade80', 7, 4.5);
       if (!died) {
         enemy.staggerTimer = Math.max(enemy.staggerTimer, 0.2);
@@ -255,6 +255,8 @@ export class CombatSystem {
     if (refund > 0) {
       this.deps.player.coolHeat(refund);
     }
+    // Attribute core explosion damage to ion weapon identity for weapon buckets.
+    if (totalDamage > 0) onDamageDealt?.(0, 'launcher');
     return totalDamage;
   }
 
@@ -288,8 +290,8 @@ export class CombatSystem {
     for (let i = 0; i < SCATTER_SHRAPNEL_COUNT; i += 1) {
       const angle = (i / SCATTER_SHRAPNEL_COUNT) * Math.PI * 2 + this.deps.rng() * 0.4;
       const dir = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
-      projectiles.spawn(from.clone().setY(0.4), dir, 16, dmg, 'player', color, {
-        sourceWeapon: 'scatter',
+    projectiles.spawn(from.clone().setY(0.4), dir, 16, dmg, 'player', color, {
+        sourceWeapon: 'scatter_shrapnel',
         pierce: 0,
       });
     }
@@ -439,7 +441,8 @@ export class CombatSystem {
         enemy.staggerTimer = Math.max(enemy.staggerTimer, 0.55);
         const died = enemy.takeDamage(OVERHEAT_EMP_DAMAGE);
         vfx.spawnBurst(enemy.group.position.clone().setY(0.4), '#f97316', 8, 5);
-        if (died) onEnemyKilled(enemy);
+        this.deps.onDamageDealt?.(OVERHEAT_EMP_DAMAGE, 'overheat_cascade');
+        if (died) onEnemyKilled(enemy, { sourceWeapon: 'overheat_cascade', damage: OVERHEAT_EMP_DAMAGE });
       }
     }
   }
@@ -475,8 +478,9 @@ export class CombatSystem {
         vfx.spawnBurst(e.group.position.clone().setY(0.5), crit ? '#fbbf24' : '#38bdf8', 7, 4.5);
         const died = e.takeDamage(dmg);
         audio.hit();
-        if (died) onEnemyKilled(e, { sourceWeapon: 'plasma', damage: dmg });
+        if (died) onEnemyKilled(e, { sourceWeapon: 'arc_capacitor', damage: dmg });
         else e.staggerTimer = Math.max(e.staggerTimer, 0.12);
+        this.deps.onDamageDealt?.(dmg, 'arc_capacitor');
         hop += 1;
       }
     } finally {
@@ -509,7 +513,7 @@ export class CombatSystem {
       nearest.group.position.z - from.z,
     ).normalize();
     projectiles.spawn(from.clone(), dir, 36, p.damage * 0.85, 'player', '#fcd34d', {
-      sourceWeapon: 'rail',
+      sourceWeapon: 'rail_ricochet',
       pierce: 0,
     });
   }
@@ -529,7 +533,8 @@ export class CombatSystem {
       const dist = Math.max(Math.sqrt(distSq), 0.0001);
       enemy.knockback(dx / dist, dz / dist, 14, 0.2);
       const died = enemy.takeDamage(SHIELD_NOVA_DAMAGE);
-      if (died) onEnemyKilled(enemy);
+      this.deps.onDamageDealt?.(SHIELD_NOVA_DAMAGE, 'shield_nova');
+      if (died) onEnemyKilled(enemy, { sourceWeapon: 'shield_nova', damage: SHIELD_NOVA_DAMAGE });
     }
   }
 
@@ -549,7 +554,8 @@ export class CombatSystem {
         if (dx * dx + dz * dz > DASH_BLAST_RADIUS * DASH_BLAST_RADIUS) continue;
         const died = enemy.takeDamage(DASH_BLAST_DAMAGE);
         vfx.spawnBurst(enemy.group.position.clone().setY(0.4), '#f472b6', 6, 4);
-        if (died) onEnemyKilled(enemy);
+        this.deps.onDamageDealt?.(DASH_BLAST_DAMAGE, 'dash_detonation');
+        if (died) onEnemyKilled(enemy, { sourceWeapon: 'dash_detonation', damage: DASH_BLAST_DAMAGE });
       }
       this.dashBlasts.splice(i, 1);
     }

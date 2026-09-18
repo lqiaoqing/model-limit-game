@@ -63,7 +63,6 @@ const WEAPONS = [
   { id: 'rail', key: 'Digit2' },
   { id: 'scatter', key: 'Digit3' },
   { id: 'launcher', key: 'Digit4' },
-  { id: 'launcher', key: 'Digit4' },
 ];
 
 const MOVE_KEYS = [
@@ -107,6 +106,14 @@ async function sample(page) {
       dps: d.dps ?? 0,
       killsPerSec: d.killsPerSec ?? 0,
       frameMs: d.frameMs ?? null,
+      damageByWeapon: d.damageByWeapon ?? {},
+      killsByWeapon: d.killsByWeapon ?? {},
+      damageByUpgrade: d.damageByUpgrade ?? {},
+      damageByHazard: d.damageByHazard ?? {},
+      damageTakenBySource: d.damageTakenBySource ?? {},
+      enemyKillsByType: d.enemyKillsByType ?? {},
+      bossPhaseDeaths: d.bossPhaseDeaths ?? 0,
+      hazardKills: d.hazardKills ?? 0,
     };
   });
 }
@@ -215,6 +222,16 @@ async function runSession(page, { seed, weaponKey, weaponId, durationSec, canvas
       projectileDamage: after?.projectileDamage ?? before.projectileDamage,
     },
     frameMs: after?.frameMs ?? null,
+    telemetry: {
+      damageByWeapon: after?.damageByWeapon ?? {},
+      killsByWeapon: after?.killsByWeapon ?? {},
+      damageByUpgrade: after?.damageByUpgrade ?? {},
+      damageByHazard: after?.damageByHazard ?? {},
+      damageTakenBySource: after?.damageTakenBySource ?? {},
+      enemyKillsByType: after?.enemyKillsByType ?? {},
+      bossPhaseDeaths: after?.bossPhaseDeaths ?? 0,
+      hazardKills: after?.hazardKills ?? 0,
+    },
     perf: {
       fpsAvg: fpsSamples.length
         ? Number((fpsSamples.reduce((a, b) => a + b, 0) / fpsSamples.length).toFixed(1))

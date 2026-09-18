@@ -50,6 +50,10 @@ import {
   type BossId,
 } from '../systems/BossDefinitions';
 import { buildDiagnostics } from '../telemetry/buildDiagnostics';
+import {
+  classifyDamageSource,
+  CombatTelemetry,
+} from '../telemetry/CombatTelemetry';
 import { bossPhaseName, t, toggleLocale, upgradeText, weaponName, weaponShort } from '../i18n';
 
 const ARENA: ArenaBounds = {
@@ -177,6 +181,7 @@ export class Game {
   private hitsLanded = 0;
   private readonly damageByWeapon: Record<string, number> = {};
   private readonly shotsByWeapon: Record<string, number> = {};
+  private readonly telemetry = new CombatTelemetry();
   private readonly frameTimes: number[] = [];
   private lastDeathCause = 'unknown';
   private pickupChain = 0;
@@ -560,12 +565,22 @@ export class Game {
     this.hazards.update(delta, state.wave, this.player, this.waves.enemies, (ev) => {
       if (ev.target === 'enemy' && ev.killed) {
         this.hazardKills += 1;
+        this.telemetry.recordKill({
+          weapon: ev.kind,
+          enemyKind: null,
+          hazard: true,
+        });
+        this.telemetry.recordDamage(0, ev.kind, 'hazard');
         if (this.combatMods.hazardConductor) {
           this.hazardBuffTimer = HAZARD_BUFF_WINDOW;
         }
       }
+      if (ev.target === 'enemy' && !ev.killed) {
+        this.telemetry.recordDamage(ev.amount, ev.kind, 'hazard');
+      }
       if (ev.target === 'player') {
         this.lastDeathCause = ev.kind;
+        this.recordPlayerTaken(ev.amount, ev.kind);
         if (ev.killed || !this.player.alive) this.onPlayerHurt();
       }
     });
@@ -627,6 +642,7 @@ export class Game {
         const hurt = this.player.takeDamage(enemy.stats.contactDamage);
         if (hurt.hit) {
           this.lastDeathCause = enemy.stats.kind;
+          this.recordPlayerTaken(enemy.stats.contactDamage, `contact:${enemy.stats.kind}`);
           this.onPlayerHurt();
           if (hurt.shieldBroke) this.combat.maybeShieldNova();
           // Shove the attacker back out so it cannot stay glued to the hull.
@@ -849,7 +865,13 @@ export class Game {
     this.combo = Math.min(8, this.combo + 0.15);
     this.peakCombo = Math.max(this.peakCombo, this.combo);
     this.comboTimer = 3.2;
-    const kind = enemy.stats.kind as 'chaser' | 'ranged' | 'elite' | 'boss';
+    const kind = enemy.stats.kind as string;
+    this.telemetry.recordKill({
+      weapon: source?.sourceWeapon ?? null,
+      enemyKind: kind,
+      boss: kind === 'boss',
+    });
+    if (kind === 'boss') this.telemetry.recordBossPhaseDeath();
     this.player.addUltCharge(
       this.player.stats.ultChargePerKill * (kind === 'boss' ? 12 : kind === 'elite' ? 2.5 : 1),
     );
@@ -956,6 +978,12 @@ export class Game {
     this.damageDealt += amount;
     this.hitsLanded += 1;
     if (weapon) this.damageByWeapon[weapon] = (this.damageByWeapon[weapon] ?? 0) + amount;
+    const bucket = classifyDamageSource(weapon);
+    this.telemetry.recordDamage(amount, weapon, bucket);
+  }
+
+  private recordPlayerTaken(amount: number, source: string): void {
+    this.telemetry.recordPlayerDamageTaken(amount, source);
   }
 
   private frameMsSnapshot(): { p50: number; p95: number; p99: number } {
@@ -1030,6 +1058,7 @@ export class Game {
           const hurt = this.player.takeDamage(exp.damage);
           if (hurt.hit) {
             this.lastDeathCause = 'bomber';
+            this.recordPlayerTaken(exp.damage, 'bomber');
             this.onPlayerHurt();
             if (hurt.shieldBroke) this.combat.maybeShieldNova();
           }
@@ -1253,6 +1282,7 @@ export class Game {
     this.hitsLanded = 0;
     for (const k of Object.keys(this.damageByWeapon)) delete this.damageByWeapon[k];
     for (const k of Object.keys(this.shotsByWeapon)) delete this.shotsByWeapon[k];
+    this.telemetry.reset();
     this.frameTimes.length = 0;
     this.lastDeathCause = 'unknown';
     this.pickupChain = 0;
@@ -2291,6 +2321,13 @@ export class Game {
       killsPerSec:
         this.combatTime > 0.05 ? Number((this.kills / this.combatTime).toFixed(2)) : 0,
       hazardKills: this.hazardKills,
+      damageByWeapon: { ...this.damageByWeapon },
+      killsByWeapon: { ...this.telemetry.snapshot().killsByWeapon },
+      damageByUpgrade: { ...this.telemetry.snapshot().damageByUpgrade },
+      damageByHazard: { ...this.telemetry.snapshot().damageByHazard },
+      damageTakenBySource: { ...this.telemetry.snapshot().damageTakenBySource },
+      enemyKillsByType: { ...this.telemetry.snapshot().enemyKillsByType },
+      bossPhaseDeaths: this.telemetry.snapshot().bossPhaseDeaths,
       frameMs: this.frameMsSnapshot(),
       player: {
         hp: this.player.hp,

@@ -217,6 +217,13 @@ declare global {
       killsPerSec?: number;
       frameMs?: { p50: number; p95: number; p99: number };
       hazardKills?: number;
+      damageByWeapon?: Record<string, number>;
+      killsByWeapon?: Record<string, number>;
+      damageByUpgrade?: Record<string, number>;
+      damageByHazard?: Record<string, number>;
+      damageTakenBySource?: Record<string, number>;
+      enemyKillsByType?: Record<string, number>;
+      bossPhaseDeaths?: number;
       player: {
         hp?: number;
         shield?: number;
