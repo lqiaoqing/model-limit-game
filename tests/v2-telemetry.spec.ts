@@ -62,38 +62,78 @@ test.describe('v2 combat telemetry', () => {
     expect(Array.isArray(Object.keys(snap.damageTakenBySource))).toBe(true);
   });
 
-  test('upgrade-rule damage appears in damageByUpgrade after grants + combat', async ({
+  test('rule-changing upgrade deals damage recorded in damageByUpgrade', async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop-chrome', 'Desktop Chrome only');
     test.setTimeout(60_000);
     await boot(page, 77);
+
+    // Deterministic rule-damage path: arc_capacitor chains on kill; dash_detonation blasts on dash.
+    const setup = await page.evaluate(() => {
+      const hooks = window.__THREE_GAME_TEST_HOOKS__;
+      if (!hooks?.grantUpgrade || !hooks?.clearEnemies || !hooks?.spawnEnemy || !hooks?.debugHitEnemy) {
+        throw new Error('hooks missing');
+      }
+      hooks.clearEnemies();
+      const arc = hooks.grantUpgrade('arc_capacitor');
+      const dash = hooks.grantUpgrade('dash_detonation');
+      const player = window.__THREE_GAME_DIAGNOSTICS__?.player?.position ?? { x: 0, z: 0 };
+      const px = player.x ?? 0;
+      const pz = player.z ?? 0;
+      // Cluster within ARC_CHAIN_RANGE (4.2) and DASH_BLAST_RADIUS (3.2).
+      hooks.spawnEnemy('chaser', px + 0.3, pz - 1.6);
+      hooks.spawnEnemy('swarm', px - 0.4, pz - 1.8);
+      hooks.spawnEnemy('chaser', px + 0.1, pz - 2.4);
+      return {
+        arc,
+        dash,
+        enemies: hooks.getEnemies?.() ?? [],
+        stacks: window.__THREE_GAME_DIAGNOSTICS__?.upgradeStacks ?? {},
+      };
+    });
+
+    expect(setup.arc.ok).toBe(true);
+    expect(setup.dash.ok).toBe(true);
+    expect(setup.stacks.arc_capacitor ?? 0).toBeGreaterThanOrEqual(1);
+    expect(setup.stacks.dash_detonation ?? 0).toBeGreaterThanOrEqual(1);
+    expect(setup.enemies.filter((e) => e.alive).length).toBeGreaterThanOrEqual(2);
+
+    // Kill the nearest clustered unit → arc_capacitor should chain and record upgrade damage.
     await page.evaluate(() => {
       const hooks = window.__THREE_GAME_TEST_HOOKS__;
-      hooks?.grantUpgrade?.('arc_capacitor');
-      hooks?.grantUpgrade?.('dash_detonation');
-      hooks?.grantUpgrade?.('ion_aftershock');
-      hooks?.spawnEnemy?.('chaser', 0, -2.5);
-      hooks?.spawnEnemy?.('swarm', 0.4, -2.2);
+      const enemies = hooks?.getEnemies?.() ?? [];
+      const player = window.__THREE_GAME_DIAGNOSTICS__?.player?.position ?? { x: 0, z: 0 };
+      const px = player.x ?? 0;
+      const pz = player.z ?? 0;
+      const target = enemies
+        .filter((e) => e.alive)
+        .sort(
+          (a, b) =>
+            Math.hypot(a.x - px, a.z - pz) - Math.hypot(b.x - px, b.z - pz),
+        )[0];
+      if (!target) throw new Error('no live enemy for rule damage');
+      hooks?.debugHitEnemy?.(target.id ?? target.kind, 9999, px, pz);
     });
+    await page.waitForTimeout(400);
+
+    // Also exercise dash_detonation: Space dash leaves a delayed blast.
     const canvas = page.locator('#game-canvas');
     const box = await canvas.boundingBox();
     const b = box as { x: number; y: number; width: number; height: number };
     await page.mouse.move(b.x + b.width * 0.5, b.y + b.height * 0.35);
-    await page.mouse.down();
-    await page.waitForTimeout(1800);
     await page.keyboard.press('Space');
-    await page.waitForTimeout(800);
-    await page.mouse.up();
+    await page.waitForTimeout(900);
 
     const snap = await page.evaluate(() => window.__THREE_GAME_DIAGNOSTICS__);
     const byUpgrade = snap?.damageByUpgrade ?? {};
-    const keys = Object.keys(byUpgrade);
-    // At least the object exists; if arc/dash fired, keys should be non-empty.
-    expect(typeof snap?.damageByUpgrade).toBe('object');
-    expect(keys.every((k) => typeof k === 'string')).toBe(true);
-    // stacks recorded
-    expect(snap?.upgradeStacks?.arc_capacitor ?? 0).toBeGreaterThanOrEqual(1);
+    const arcDmg = byUpgrade.arc_capacitor ?? 0;
+    const dashDmg = byUpgrade.dash_detonation ?? 0;
+    const ruleTotal = arcDmg + dashDmg;
+
+    // Must prove a rule-changing upgrade actually produced telemetry damage — not merely that the object exists.
+    expect(ruleTotal, `damageByUpgrade=${JSON.stringify(byUpgrade)}`).toBeGreaterThan(0);
+    expect(arcDmg > 0 || dashDmg > 0).toBe(true);
   });
 
   test('enemy kills counted by archetype kind', async ({ page }, testInfo) => {

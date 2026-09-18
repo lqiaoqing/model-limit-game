@@ -9,6 +9,8 @@ type Snap = {
   dps?: number;
   killsPerSec?: number;
   combatTime?: number;
+  shotsFired?: number;
+  damageDealt?: number;
   frameMs?: { p50: number; p95: number; p99: number };
   bossPhase?: number | null;
   enemies?: number;
@@ -39,6 +41,8 @@ async function buildSnap(page: import('@playwright/test').Page) {
       dps: d?.dps,
       killsPerSec: d?.killsPerSec,
       combatTime: d?.combatTime,
+      shotsFired: d?.shotsFired,
+      damageDealt: d?.damageDealt,
       frameMs: d?.frameMs,
       bossPhase: d?.bossPhase,
       enemies: d?.enemies,
@@ -149,17 +153,34 @@ test.describe('v2 combat regression', () => {
     await page.mouse.up();
     const snap = await buildSnap(page);
     expect(snap.wave).toBeGreaterThanOrEqual(1);
-    expect(snap.enemies).toBeGreaterThanOrEqual(0);
+    expect(snap.enemies, 'live wave should spawn at least one enemy after director tick').toBeGreaterThan(0);
   });
 
   test('diagnostics expose real dps fields and frame times', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop-chrome', 'Desktop Chrome only');
     test.setTimeout(60_000);
     await boot(page, 65535);
-    await page.waitForTimeout(800);
+    await page.evaluate(() => {
+      const hooks = window.__THREE_GAME_TEST_HOOKS__;
+      hooks?.clearEnemies?.();
+      hooks?.spawnEnemy?.('chaser', 0, -2.2);
+      hooks?.spawnEnemy?.('chaser', 0.4, -2.5);
+    });
+    const canvas = page.locator('#game-canvas');
+    const box = await canvas.boundingBox();
+    const b = box as { x: number; y: number; width: number; height: number };
+    await page.mouse.move(b.x + b.width * 0.5, b.y + b.height * 0.35);
+    await page.mouse.down();
+    await page.waitForTimeout(2200);
+    await page.mouse.up();
     const snap = await buildSnap(page);
     expect(snap.combatTime).toBeGreaterThan(0);
-    expect(snap.dps).toBeGreaterThanOrEqual(0);
+    expect(snap.shotsFired ?? 0).toBeGreaterThan(0);
+    // Real DPS only when damage landed; fields must still be present either way.
+    expect(typeof snap.dps).toBe('number');
+    if ((snap.damageDealt ?? 0) > 0) {
+      expect(snap.dps, 'dps > 0 when damageDealt > 0').toBeGreaterThan(0);
+    }
     expect(snap.killsPerSec).toBeGreaterThanOrEqual(0);
     expect(snap.frameMs?.p50).toBeGreaterThan(0);
     expect(snap.frameMs?.p99).toBeGreaterThanOrEqual(snap.frameMs?.p50 ?? 0);

@@ -63,7 +63,9 @@ test.describe('v2 arena hazards', () => {
     expect(phases).toContain('active');
   });
 
-  test('hazard field damages enemies; cores are shootable', async ({ page }, testInfo) => {
+  test('overload core: warning → active damages near targets; far target unaffected', async ({
+    page,
+  }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop-chrome', 'Desktop Chrome only');
     test.setTimeout(60_000);
     await boot(page, 42);
@@ -73,92 +75,173 @@ test.describe('v2 arena hazards', () => {
         throw new Error('hooks missing');
       }
       hooks.clearEnemies();
+      hooks.setEnemyPassive?.(true);
+      hooks.setFreezeEnemies?.(true);
       const core = hooks.triggerHazard('overload_core');
       if (!core.ok || !core.hazard) throw new Error('core spawn failed');
-      // Place chasers inside the core blast ring.
+      // Near: inside blast ring (radius 2.8). Far: outside ring but inside arena.
+      const farX = Math.min(12.5, core.hazard.x + 5.5);
+      const farZ = Math.min(7.5, core.hazard.z + 5.5);
       hooks.spawnEnemy('chaser', core.hazard.x + 0.3, core.hazard.z + 0.2);
       hooks.spawnEnemy('chaser', core.hazard.x - 0.2, core.hazard.z - 0.3);
-      hooks.spawnEnemy('chaser', 10, 7); // far decoy
+      hooks.spawnEnemy('chaser', farX, farZ);
       await new Promise((r) => setTimeout(r, 80));
-      return {
-        core,
-        enemies: hooks.getEnemies(),
-      };
+      const enemies = hooks.getEnemies();
+      return { core, enemies, farX, farZ };
     });
     const core = setup.core.hazard;
     if (!core) throw new Error('missing core hazard');
-    expect(core.phase).toBe('warning');
+    expect(core.phase, 'overload core starts in warning').toBe('warning');
 
-    // Wait for core warning → it stays until shot or timer; force via many rail-like hits using debug path:
-    // Player fires from origin; place aim by waiting natural active if core self-detonates after warning.
-    // Overload core activeDur is short after warning — it will self-detonate.
+    const beforeNear = setup.enemies.filter(
+      (e) => Math.hypot(e.x - core.x, e.z - core.z) < 3.2,
+    );
+    const beforeFar = setup.enemies.find(
+      (e) => Math.hypot(e.x - setup.farX, e.z - setup.farZ) < 0.6,
+    );
+    expect(beforeNear.length, 'near targets spawned').toBeGreaterThanOrEqual(2);
+    expect(beforeFar, 'far target spawned').toBeTruthy();
+    const farId = beforeFar!.id ?? '';
+    const farHpBefore = beforeFar!.hp;
+
+    // Warning window must not yet deal hazard damage to the far decoy.
+    await page.waitForTimeout(400);
+    const mid = await page.evaluate(() => window.__THREE_GAME_TEST_HOOKS__?.getEnemies?.() ?? []);
+    const farMid = mid.find((e) => (e.id && e.id === farId) || Math.hypot(e.x - setup.farX, e.z - setup.farZ) < 0.8);
+    if (farMid) expect(farMid.hp).toBe(farHpBefore);
+
+    // Core self-detonates after warning → active.
     await page.waitForTimeout(2500);
 
-    const after = await page.evaluate(() => {
-      const hooks = window.__THREE_GAME_TEST_HOOKS__;
-      return {
-        hazards: hooks?.getHazardSnapshot?.(),
-        enemies: hooks?.getEnemies?.() ?? [],
-        hazardKills: window.__THREE_GAME_DIAGNOSTICS__?.hazardKills ?? 0,
-      };
-    });
+    const after = await page.evaluate(
+      (far: { id: string; x: number; z: number }) => {
+        const hooks = window.__THREE_GAME_TEST_HOOKS__;
+        const enemies = hooks?.getEnemies?.() ?? [];
+        return {
+          hazards: hooks?.getHazardSnapshot?.(),
+          enemies,
+          farAfter:
+            enemies.find((e) => e.id && e.id === far.id) ??
+            enemies.find((e) => Math.hypot(e.x - far.x, e.z - far.z) < 0.8) ??
+            null,
+          hazardKills: window.__THREE_GAME_DIAGNOSTICS__?.hazardKills ?? 0,
+          damageByHazard: window.__THREE_GAME_DIAGNOSTICS__?.damageByHazard ?? {},
+        };
+      },
+      { id: farId, x: setup.farX, z: setup.farZ },
+    );
 
-    const far = after.enemies.find((e) => Math.abs(e.x - 10) < 0.5 && Math.abs(e.z - 7) < 0.5);
-    const nearCore = after.enemies.filter(
+    const nearAfter = after.enemies.filter(
       (e) => Math.hypot(e.x - (core?.x ?? 0), e.z - (core?.z ?? 0)) < 3.2,
     );
-    // Near-core units should be damaged or dead after detonation/field.
-    const hurtNear = nearCore.some((e) => !e.alive || e.hp < 28);
-    expect(hurtNear || (after.hazardKills ?? 0) >= 1).toBe(true);
-    if (far) expect(far.alive).toBe(true);
+    const farAfter = after.farAfter;
+
+    // Near targets must be damaged or dead after active detonation.
+    const hurtNear = nearAfter.some((e) => !e.alive || e.hp < 28);
+    const hazardDmg = Object.values(after.damageByHazard ?? {}).reduce((a, b) => a + b, 0);
+    expect(
+      hurtNear || (after.hazardKills ?? 0) >= 1 || hazardDmg > 0,
+      `near damaged after active (kills=${after.hazardKills} hazardDmg=${hazardDmg})`,
+    ).toBe(true);
+
+    // Far target unaffected.
+    expect(farAfter, 'far target still present').toBeTruthy();
+    expect(farAfter!.alive, 'far target still alive').toBe(true);
+    expect(farAfter!.hp, 'far target hp unchanged').toBe(farHpBefore);
   });
 
-  test('laser gate damages enemies standing in the line', async ({ page }, testInfo) => {
+  test('laser gate: warning then active damages on-line target; off-line unaffected', async ({
+    page,
+  }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop-chrome', 'Desktop Chrome only');
     test.setTimeout(60_000);
     await boot(page, 42);
+    const phases: string[] = [];
     const setup = await page.evaluate(() => {
       const hooks = window.__THREE_GAME_TEST_HOOKS__;
       if (!hooks?.clearEnemies || !hooks?.spawnEnemy || !hooks?.triggerHazard || !hooks?.getEnemies) {
         throw new Error('hooks missing');
       }
       hooks.clearEnemies();
+      hooks.setEnemyPassive?.(true);
+      hooks.setFreezeEnemies?.(true);
       const r = hooks.triggerHazard('laser_gate');
       if (!r.ok || !r.hazard) throw new Error('laser spawn failed');
       const h = r.hazard;
-      // Spawn on the laser line.
-      if (h.axis === 0) {
-        hooks.spawnEnemy('chaser', h.x, h.z);
-        hooks.spawnEnemy('chaser', h.x + 8, h.z); // off-line
-      } else {
-        hooks.spawnEnemy('chaser', h.x, h.z);
-        hooks.spawnEnemy('chaser', h.x, h.z + 8);
-      }
-      return { h, enemies: hooks.getEnemies() };
+      // On-line vs off-line: laser half-width is 0.45; place off-line at ±2.0.
+      const offX = h.axis === 0 ? h.x + 2.0 : h.x;
+      const offZ = h.axis === 0 ? h.z : h.z + 2.0;
+      hooks.spawnEnemy('chaser', h.x, h.z);
+      hooks.spawnEnemy('chaser', offX, offZ);
+      return { h, enemies: hooks.getEnemies(), offX, offZ, phase0: hooks.getHazardSnapshot?.() };
     });
     const h = setup.h;
-    const onLineBefore = setup.enemies.find(
-      (e) => Math.hypot(e.x - h.x, e.z - h.z) < 0.6,
+    const onLineBefore = setup.enemies.find((e) => Math.hypot(e.x - h.x, e.z - h.z) < 0.6);
+    const offLineBefore = setup.enemies.find(
+      (e) => Math.hypot(e.x - setup.offX, e.z - setup.offZ) < 0.6,
     );
-    expect(onLineBefore).toBeTruthy();
+    expect(onLineBefore, 'on-line enemy').toBeTruthy();
+    expect(offLineBefore, 'off-line enemy').toBeTruthy();
+    expect(setup.phase0?.hazards?.find((x) => x.kind === 'laser_gate')?.phase).toBe('warning');
 
-    // warning 1.2s + active ticks
-    await page.waitForTimeout(3500);
-    const after = await page.evaluate(
-      () => window.__THREE_GAME_TEST_HOOKS__?.getEnemies?.() ?? [],
-    );
-    const onLine = after.find((e) => Math.hypot(e.x - h.x, e.z - h.z) < 1.2 && e.kind === 'chaser');
-    const offLine = after.find((e) => {
-      const d =
-        h.axis === 0
-          ? Math.hypot(e.x - (h.x + 8), e.z - h.z)
-          : Math.hypot(e.x - h.x, e.z - (h.z + 8));
-      return d < 2;
-    });
-    if (onLine) {
-      expect(onLine.alive === false || onLine.hp < (onLineBefore?.hp ?? 28)).toBe(true);
+    const onId = onLineBefore!.id ?? '';
+    const offId = offLineBefore!.id ?? '';
+    const onHpBefore = onLineBefore!.hp;
+    const offHpBefore = offLineBefore!.hp;
+
+    // Sample phases: warning first, then active; no damage expected while still warning.
+    for (let i = 0; i < 20; i += 1) {
+      await page.waitForTimeout(200);
+      const snap = await page.evaluate(
+        () => window.__THREE_GAME_TEST_HOOKS__?.getHazardSnapshot?.(),
+      );
+      const laser = snap?.hazards.find((x) => x.kind === 'laser_gate');
+      if (laser) phases.push(laser.phase);
+      if (laser?.phase === 'warning') {
+        const live = await page.evaluate(
+          () => window.__THREE_GAME_TEST_HOOKS__?.getEnemies?.() ?? [],
+        );
+        const on = live.find((e) => (e.id && e.id === onId) || Math.hypot(e.x - h.x, e.z - h.z) < 1.2);
+        if (on?.alive) {
+          expect(on.hp, 'warning phase must not damage on-line target yet').toBe(onHpBefore);
+        }
+      }
+      if (phases.includes('active') && i > 4) break;
     }
-    if (offLine) expect(offLine.alive).toBe(true);
+    expect(phases).toContain('warning');
+    expect(phases).toContain('active');
+
+    await page.waitForTimeout(2000);
+    const after = await page.evaluate(
+      (ids: { onId: string; offId: string; offX: number; offZ: number; onX: number; onZ: number }) => {
+        const hooks = window.__THREE_GAME_TEST_HOOKS__;
+        const enemies = hooks?.getEnemies?.() ?? [];
+        return {
+          enemies,
+          onLine:
+            enemies.find((e) => e.id && e.id === ids.onId) ??
+            enemies.find((e) => Math.hypot(e.x - ids.onX, e.z - ids.onZ) < 1.2),
+          offLine:
+            enemies.find((e) => e.id && e.id === ids.offId) ??
+            enemies.find((e) => Math.hypot(e.x - ids.offX, e.z - ids.offZ) < 0.8),
+          damageByHazard: window.__THREE_GAME_DIAGNOSTICS__?.damageByHazard ?? {},
+          hazardKills: window.__THREE_GAME_DIAGNOSTICS__?.hazardKills ?? 0,
+        };
+      },
+      { onId, offId, offX: setup.offX, offZ: setup.offZ, onX: h.x, onZ: h.z },
+    );
+
+    const onLine = after.onLine;
+    const offLine = after.offLine;
+    const laserDmg = after.damageByHazard.laser_gate ?? 0;
+    expect(
+      (onLine && (!onLine.alive || onLine.hp < onHpBefore)) || laserDmg > 0 || (after.hazardKills ?? 0) >= 1,
+      `on-line damaged after active (hp ${onHpBefore} -> ${onLine?.hp ?? 'gone'} laserDmg=${laserDmg})`,
+    ).toBe(true);
+
+    expect(offLine, 'off-line still present').toBeTruthy();
+    expect(offLine!.alive, 'off-line still alive').toBe(true);
+    expect(offLine!.hp, 'off-line hp unchanged').toBe(offHpBefore);
   });
 
   test('wave 1 budget is zero; wave 8 allows hazards', async ({ page }, testInfo) => {
@@ -170,7 +253,6 @@ test.describe('v2 arena hazards', () => {
       return { w1: plan(1), w3: plan(3), w8: plan(8), w12: plan(12) };
     });
     expect(budgets.w1.length).toBe(0);
-    expect(budgets.w3.length).toBeGreaterThanOrEqual(0);
     expect(budgets.w3.length).toBeLessThanOrEqual(1);
     expect(budgets.w8.length).toBeGreaterThanOrEqual(1);
     expect(budgets.w8.length).toBeLessThanOrEqual(2);

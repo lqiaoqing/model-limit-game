@@ -68,63 +68,97 @@ test.describe('v2 content · ion launcher', () => {
     expect(plasma1.fireInterval).toBeCloseTo(plasma0.fireInterval, 5);
   });
 
-  test('launcher fires and impact damages multiple nearby enemies', async ({ page }, testInfo) => {
+  test('launcher impact AoE damages ≥2 in-radius targets and leaves outside target intact', async ({
+    page,
+  }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop-chrome', 'Desktop Chrome only');
     test.setTimeout(60_000);
     await boot(page, 42);
 
+    type EnemySnap = { id?: string; kind: string; x: number; z: number; hp: number; alive: boolean };
+
     const setup = await page.evaluate(async () => {
       const hooks = window.__THREE_GAME_TEST_HOOKS__;
-      if (!hooks?.forceWeapon || !hooks?.spawnEnemy) throw new Error('hooks missing');
+      if (!hooks?.forceWeapon || !hooks?.spawnEnemy || !hooks?.clearEnemies || !hooks?.getEnemies) {
+        throw new Error('hooks missing');
+      }
+      hooks.clearEnemies();
       hooks.forceWeapon('launcher');
       const player = window.__THREE_GAME_DIAGNOSTICS__?.player?.position ?? { x: 0, z: 0 };
       const px = player.x ?? 0;
       const pz = player.z ?? 0;
-      // Cluster three chasers along the aim line (player aims -Z by default).
-      hooks.spawnEnemy('chaser', px, pz - 3.2);
-      hooks.spawnEnemy('chaser', px + 0.9, pz - 3.4);
-      hooks.spawnEnemy('chaser', px - 0.9, pz - 3.4);
-      hooks.spawnEnemy('chaser', px + 8.5, pz + 8.5); // far decoy
-      const before = hooks.getEnemies?.() ?? [];
+
+      // Deterministic layout along default aim (-Z):
+      // A = impact target, B = inside AoE (launcher aoeRadius 2.55), C = far outside.
+      const a = { x: px, z: pz - 3.2 };
+      const b = { x: px + 0.85, z: pz - 3.45 };
+      const c = { x: px + 8.5, z: pz + 8.5 };
+      hooks.spawnEnemy('chaser', a.x, a.z);
+      hooks.spawnEnemy('chaser', b.x, b.z);
+      hooks.spawnEnemy('chaser', c.x, c.z);
+
+      const enemies = hooks.getEnemies() ?? [];
+      const near = (e: EnemySnap, p: { x: number; z: number }, r = 0.55) =>
+        Math.hypot(e.x - p.x, e.z - p.z) <= r;
+      const snapA = enemies.find((e) => e.alive && near(e, a));
+      const snapB = enemies.find((e) => e.alive && near(e, b));
+      const snapC = enemies.find((e) => e.alive && near(e, c));
       return {
         weapon: hooks.getBuildSnapshot?.().weapon,
-        before,
-        aliveBefore: before.filter((e) => e.alive).length,
+        a: snapA ? { ...snapA, id: snapA.id ?? '' } : null,
+        b: snapB ? { ...snapB, id: snapB.id ?? '' } : null,
+        c: snapC ? { ...snapC, id: snapC.id ?? '' } : null,
+        aliveCount: enemies.filter((e) => e.alive).length,
       };
     });
+
     expect(setup.weapon).toBe('launcher');
-    expect(setup.aliveBefore).toBeGreaterThanOrEqual(4);
+    expect(setup.aliveCount).toBeGreaterThanOrEqual(3);
+    expect(setup.a, 'impact target A').toBeTruthy();
+    expect(setup.b, 'in-AoE target B').toBeTruthy();
+    expect(setup.c, 'outside target C').toBeTruthy();
+    expect(setup.a!.id).toBeTruthy();
+    expect(setup.b!.id).toBeTruthy();
+    expect(setup.c!.id).toBeTruthy();
 
-    // Hold fire long enough for at least one slow ion bolt + impact resolve.
-    await page.mouse.move(640, 200);
+    // Single-burst window: fire once toward -Z (center top of canvas).
+    await page.mouse.move(640, 180);
     await page.mouse.down();
-    await page.waitForTimeout(900);
+    await page.waitForTimeout(250);
     await page.mouse.up();
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(1400);
 
-    const after = await page.evaluate(() => {
+    const after = await page.evaluate((ids: { a: string; b: string; c: string }) => {
       const hooks = window.__THREE_GAME_TEST_HOOKS__;
       const enemies = hooks?.getEnemies?.() ?? [];
-      const d = window.__THREE_GAME_DIAGNOSTICS__;
+      const byId = new Map(enemies.map((e) => [e.id ?? '', e]));
       return {
-        enemies,
-        kills: d?.kills ?? 0,
-        damageDealt: d?.damageDealt ?? 0,
-        shotsFired: d?.shotsFired ?? 0,
+        a: byId.get(ids.a) ?? null,
+        b: byId.get(ids.b) ?? null,
+        c: byId.get(ids.c) ?? null,
+        shotsFired: window.__THREE_GAME_DIAGNOSTICS__?.shotsFired ?? 0,
+        damageByWeapon: window.__THREE_GAME_DIAGNOSTICS__?.damageByWeapon ?? {},
       };
-    });
+    }, { a: setup.a!.id, b: setup.b!.id, c: setup.c!.id });
 
     expect(after.shotsFired).toBeGreaterThan(0);
-    const beforeHp = new Map(setup.before.map((e) => [`${e.kind}:${e.x.toFixed(2)}:${e.z.toFixed(2)}`, e.hp]));
-    let multiDamaged = 0;
-    for (const e of after.enemies) {
-      if (!e.alive) continue;
-      const key = `${e.kind}:${e.x.toFixed(2)}:${e.z.toFixed(2)}`;
-      const prev = beforeHp.get(key);
-      if (prev !== undefined && e.hp < prev) multiDamaged += 1;
-    }
-    // AoE identity: either multiple living enemies lost HP, or kills jumped from the blast.
-    expect(multiDamaged >= 2 || after.kills >= 1 || after.damageDealt > 0).toBeTruthy();
+
+    const hurt = (snap: EnemySnap | null, before: EnemySnap) => {
+      if (!snap) return true;
+      return !snap.alive || snap.hp < before.hp;
+    };
+
+    // AoE identity: impact target AND at least one other in-radius target both took damage.
+    expect(hurt(after.a, setup.a!), `A damaged (hp ${setup.a!.hp} -> ${after.a?.hp ?? 'gone'})`).toBe(true);
+    expect(hurt(after.b, setup.b!), `B damaged (hp ${setup.b!.hp} -> ${after.b?.hp ?? 'gone'})`).toBe(true);
+
+    // Outside target must be untouched by the impact blast.
+    expect(after.c, 'C still present').toBeTruthy();
+    expect(after.c!.alive, 'C still alive').toBe(true);
+    expect(after.c!.hp, 'C hp unchanged').toBe(setup.c!.hp);
+
+    const launcherDmg = after.damageByWeapon.launcher ?? 0;
+    expect(launcherDmg, 'launcher damage recorded').toBeGreaterThan(0);
   });
 
   test('launcher affinity upgrades do not modify rail/plasma/scatter', async ({ page }, testInfo) => {

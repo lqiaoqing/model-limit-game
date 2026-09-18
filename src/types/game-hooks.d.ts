@@ -184,6 +184,8 @@ declare global {
         poolSize?: number;
         ruleCount?: number;
       };
+      setEnemyPassive?: (v: boolean) => void;
+      setFreezeEnemies?: (v: boolean) => void;
     };
     __THREE_GAME_DIAGNOSTICS__?: {
       frame: number;
