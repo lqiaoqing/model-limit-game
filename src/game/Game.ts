@@ -5,7 +5,7 @@ import { createRenderBackend, initRenderBackend, resizeBackend, type RenderBacke
 import { Cover } from '../entities/Cover';
 import { Pickup, type PickupKind } from '../entities/Pickup';
 import { Player, DEFAULT_PLAYER_STATS, type ArenaBounds } from '../entities/Player';
-import { ENEMY_TEMPLATES, type Enemy, type EnemyKind } from '../entities/Enemy';
+import { type Enemy, type EnemyKind } from '../entities/Enemy';
 import { ProjectilePool } from '../entities/Projectile';
 import { AudioSystem } from '../systems/AudioSystem';
 import { CameraRig } from '../systems/CameraRig';
@@ -26,14 +26,11 @@ import {
   countUpgrades,
   getUpgrade,
   rollUpgradeOffers,
-  UPGRADE_POOL,
   type UpgradeId,
   type UpgradeOffer,
 } from '../systems/UpgradePool';
 import { enemyFormTierForWave } from '../systems/EnemyAssets';
 import { createSeededRandom } from '../utils/random';
-import { composeWaveTickets } from '../systems/EncounterDirector';
-import { auditWaveTickets, fullCyclePlan, wavePlan } from '../systems/WaveProgression';
 import { WEAPON_DEFS, weaponAt, type WeaponId } from '../combat/Weapons';
 import { createCombatModifiers, EMERGENCY_HP_RATIO, EMERGENCY_SHIELD, HAZARD_BUFF_WINDOW, modifierIds, PLASMA_FEEDBACK_HEAT_REFUND, resetCombatModifiers, type CombatModifiers } from '../combat/CombatModifiers';
 import { createCombatBuild, resetCombatBuild, resolveWeaponStats } from '../combat/CombatBuild';
@@ -49,12 +46,14 @@ import {
   getBossPhaseById,
   type BossId,
 } from '../systems/BossDefinitions';
-import { buildDiagnostics } from '../telemetry/buildDiagnostics';
+import { publishGameDiagnostics } from '../telemetry/publishGameDiagnostics';
 import {
   classifyDamageSource,
   CombatTelemetry,
 } from '../telemetry/CombatTelemetry';
 import { bossPhaseName, t, toggleLocale, upgradeText, weaponName, weaponShort } from '../i18n';
+import { installGameTestHooks, type GameTestHooksHost } from '../testing/GameTestHooks';
+import { createDebugActionHandlers } from '../testing/DebugControls';
 
 const ARENA: ArenaBounds = {
   halfWidth: 14,
@@ -273,68 +272,51 @@ export class Game {
     this.debugTools = new DebugTools(
       this.tuning,
       this.debugFlags,
-      {
-        fullHeal: () => {
-          this.player.hp = this.player.stats.maxHp;
-          this.player.shield = this.player.stats.maxShield;
-          this.player.alive = true;
-          this.player.group.visible = true;
-          if (this.mode === 'dead') this.mode = 'play';
+      createDebugActionHandlers({
+        getPlayer: () => this.player,
+        getMode: () => this.mode,
+        setMode: (m) => {
+          this.mode = m as typeof this.mode;
         },
-        clearHeat: () => {
-          this.player.heat = 0;
-          this.player.overheated = false;
+        applyUpgradeCtx: (def) => {
+          def.apply({
+            stats: this.player.stats,
+            build: this.combatBuild,
+            mods: this.combatMods,
+          });
         },
-        fillUlt: () => {
-          this.player.ultCharge = 100;
+        getUpgradeStacks: () => this.upgradeStacks,
+        bumpUpgradeStack: (id) => {
+          this.upgradeStacks[id as UpgradeId] = (this.upgradeStacks[id as UpgradeId] ?? 0) + 1;
         },
-        grantAllUpgrades: () => {
-          for (const def of UPGRADE_POOL) {
-            const stacks = this.upgradeStacks[def.id] ?? 0;
-            const need = def.maxStacks - stacks;
-            for (let i = 0; i < need; i += 1) {
-              def.apply({
-                stats: this.player.stats,
-                build: this.combatBuild,
-                mods: this.combatMods,
-              });
-              this.upgradeStacks[def.id] = (this.upgradeStacks[def.id] ?? 0) + 1;
-            }
-          }
-          this.syncWeaponStats();
-          this.player.overheatEmp = this.combatMods.overheatEmp;
-          this.player.hp = this.player.stats.maxHp;
-          this.player.shield = this.player.stats.maxShield;
-          this.refreshPlayerForm();
+        syncWeaponStats: () => this.syncWeaponStats(),
+        setOverheatEmp: (v) => {
+          this.player.overheatEmp = v;
         },
-        killAllEnemies: () => {
+        getCombatMods: () => this.combatMods,
+        refreshPlayerForm: () => this.refreshPlayerForm(),
+        forEachLiveEnemy: (fn) => {
           for (const enemy of [...this.waves.enemies]) {
             if (!enemy.alive) continue;
-            enemy.takeDamage(999999);
-            this.onEnemyKilled(enemy);
+            fn(enemy);
           }
         },
-        skipWave: () => {
-          for (const enemy of [...this.waves.enemies]) {
-            if (!enemy.alive) continue;
-            enemy.takeDamage(999999);
-            this.onEnemyKilled(enemy);
-          }
-          this.waves.debugClearWave();
-        },
-        openUpgrade: () => {
+        onEnemyKilled: (enemy) => this.onEnemyKilled(enemy),
+        debugClearWave: () => this.waves.debugClearWave(),
+        openUpgradePicker: () => {
           this.lastWaveShown = Math.max(0, this.waves.wave - 1);
           this.mode = 'play';
           this.openUpgrade();
         },
         restart: () => this.restart(),
-        setStress: (on) => this.setStressMode(on),
-        setLowGraphics: (on) => {
-          this.setLowGraphics(on);
+        setStressMode: (on) => this.setStressMode(on),
+        setLowGraphics: (on) => this.setLowGraphics(on),
+        setGfxToggleChecked: (on) => {
           const gfx = document.querySelector<HTMLInputElement>('#gfx-toggle');
           if (gfx) gfx.checked = on;
         },
-      },
+        publishDiagnostics: () => this.publishDiagnostics(),
+      }),
       () => {
         this.renderer.toneMappingExposure = this.tuning.exposure;
         this.syncPostSize();
@@ -2071,80 +2053,84 @@ export class Game {
   }
 
   private installTestHooks(): void {
-    window.__THREE_GAME_TEST_HOOKS__ = {
-      seed: (value: number) => {
+    installGameTestHooks(this.createTestHooksHost());
+  }
+
+  private createTestHooksHost(): GameTestHooksHost {
+    return {
+      seedRng: (value) => {
         this.rngSeed = value;
         this.rng = createSeededRandom(value);
       },
-      setState: (name: string) => {
-        if (name !== 'active-play' && name !== 'complete' && name !== 'stress') {
-          throw new Error(`Unknown test state: ${name}`);
-        }
-        this.restart();
-        if (name === 'complete') {
-          this.score = 12800;
-          this.elapsed = 95;
-          this.combo = 3.5;
-          this.peakCombo = 4.2;
-          this.player.ultCharge = 100;
-          this.kills = 87;
-          this.mode = 'play';
-        }
-        if (name === 'stress') {
-          this.setStressMode(true);
-          this.restart();
-          this.setStressMode(true);
-          this.enemyBatch.sync(this.waves.enemies);
-          this.pushHud(0);
-        }
-        this.render();
-        this.publishDiagnostics();
-        return { state: name };
+      restart: () => this.restart(),
+      setScore: (v) => {
+        this.score = v;
       },
-      setPausedForScreenshot: (paused: boolean) => {
-        this.pausedForScreenshot = paused;
+      setElapsed: (v) => {
+        this.elapsed = v;
       },
-      setReducedMotion: (enabled: boolean) => {
-        this.reducedMotion = enabled;
-        if (enabled) this.player.stabilizeVisuals();
-        this.render();
-        this.publishDiagnostics();
+      setCombo: (v) => {
+        this.combo = v;
       },
-      hideDebugUi: (hidden: boolean) => {
-        this.debugTools.setHidden(hidden);
-        this.hud.setPerfVisible(!hidden);
+      setPeakCombo: (v) => {
+        this.peakCombo = v;
       },
-      pickUpgrade: (index: number) => {
-        this.applyUpgrade(index);
-        return { mode: this.mode };
+      setUltCharge: (v) => {
+        this.player.ultCharge = v;
       },
-      grantUpgrade: (id: string) => {
-        const def = getUpgrade(id as UpgradeId);
-        if (!def) return { ok: false };
-        def.apply({ stats: this.player.stats, build: this.combatBuild, mods: this.combatMods });
+      setKills: (v) => {
+        this.kills = v;
+      },
+      setMode: (v) => {
+        this.mode = v as typeof this.mode;
+      },
+      setStressMode: (on) => this.setStressMode(on),
+      syncEnemyBatch: () => this.enemyBatch.sync(this.waves.enemies),
+      pushHud: (d) => this.pushHud(d),
+      render: () => this.render(),
+      publishDiagnostics: () => this.publishDiagnostics(),
+      setPausedForScreenshot: (v) => {
+        this.pausedForScreenshot = v;
+      },
+      setReducedMotion: (v) => {
+        this.reducedMotion = v;
+      },
+      stabilizeVisuals: () => this.player.stabilizeVisuals(),
+      setHiddenDebugUi: (hidden) => this.debugTools.setHidden(hidden),
+      setPerfVisible: (v) => this.hud.setPerfVisible(v),
+      applyUpgrade: (index) => this.applyUpgrade(index),
+      getMode: () => this.mode,
+      applyUpgradeDef: (def) => {
+        def.apply({
+          stats: this.player.stats,
+          build: this.combatBuild,
+          mods: this.combatMods,
+        });
+      },
+      bumpUpgradeStack: (id) => {
         this.upgradeStacks[id as UpgradeId] = (this.upgradeStacks[id as UpgradeId] ?? 0) + 1;
-        this.syncWeaponStats();
-        this.player.overheatEmp = this.combatMods.overheatEmp;
-        this.publishDiagnostics();
-        return { ok: true, weapon: this.weapon };
       },
-      forceWeapon: (id: string) => {
-        if (!(id in WEAPON_DEFS)) return { ok: false, weapon: this.weapon };
+      syncWeaponStats: () => this.syncWeaponStats(),
+      setOverheatEmp: (v) => {
+        this.player.overheatEmp = v;
+      },
+      getWeapon: () => this.weapon,
+      setWeapon: (id) => {
+        if (!(id in WEAPON_DEFS)) return false;
         this.setWeapon(id as WeaponId);
-        return { ok: true, weapon: this.weapon };
+        return true;
       },
-      spawnEnemy: (kind: string, x?: number, z?: number) => {
-        const k = kind as EnemyKind;
-        if (!(k in ENEMY_TEMPLATES)) return { ok: false, enemies: this.waves.enemies.length };
-        if (typeof x === 'number' && typeof z === 'number') {
-          this.waves.spawnAt(k, x, z);
-        } else {
-          this.waves.forceSpawnNear(this.player.group.position, k);
-        }
-        this.enemyBatch.sync(this.waves.enemies);
-        return { ok: true, enemies: this.waves.enemies.length };
+      getCombatModsOverheatEmp: () => this.combatMods.overheatEmp,
+      getWavesEnemies: () => this.waves.enemies.length,
+      spawnEnemyAt: (kind, x, z) => {
+        this.waves.spawnAt(kind as EnemyKind, x, z);
       },
-      forceBoss: (id: string) => {
+      forceSpawnNearPlayer: (kind) => {
+        this.waves.forceSpawnNear(this.player.group.position, kind as EnemyKind);
+      },
+      clearWavesEnemies: () => this.waves.clearEnemies(),
+      listEnemies: () => this.waves.listEnemies(),
+      forceBossInternal: (id) => {
         const bossId = id as BossId;
         if (bossId !== 'titan07' && bossId !== 'orbital_warden' && bossId !== 'void_engine') {
           return { ok: false };
@@ -2162,7 +2148,7 @@ export class Game {
           bosses: this.waves.enemies.filter((e) => e.stats.kind === 'boss').length,
         };
       },
-      setBossHpRatio: (ratio: number) => {
+      setBossHpRatioInternal: (ratio) => {
         const boss = this.waves.boss;
         if (!boss) return { ok: false };
         const r = Math.min(1, Math.max(0.01, ratio));
@@ -2177,7 +2163,7 @@ export class Game {
           bossId: boss.bossId,
         };
       },
-      getBossSnapshot: () => {
+      getBossSnapshotInternal: () => {
         const boss = this.waves.boss;
         return {
           activeBossId: this.activeBossId,
@@ -2187,44 +2173,13 @@ export class Game {
           director: this.bossDirector.snapshot(),
         };
       },
-      getEnemies: () => this.waves.listEnemies(),
-      clearEnemies: () => {
-        this.waves.clearEnemies();
-        this.enemyBatch.sync(this.waves.enemies);
-        return { ok: true, enemies: 0 };
-      },
-      forceWave: (wave: number) => {
+      debugSetWave: (wave) => {
         this.waves.debugSetWave(Math.max(1, wave), this.player.group.position);
         this.lastWaveShown = this.waves.wave;
         this.enemyBatch.sync(this.waves.enemies);
         return { wave: this.waves.wave, squads: this.waves.squads };
       },
-      composeEncounter: (wave: number, seed: number) => {
-        const rng = createSeededRandom(seed);
-        return composeWaveTickets({
-          wave,
-          stressMode: false,
-          rng,
-          bossWave: wave % 5 === 0,
-          halfWidth: 14,
-          halfDepth: 9,
-        });
-      },
-      getWavePlan: (wave: number) => wavePlan(wave),
-      getFullCyclePlan: () => fullCyclePlan(),
-      auditWave: (wave: number, seed: number) => {
-        const rng = createSeededRandom(seed);
-        const enc = composeWaveTickets({
-          wave,
-          stressMode: false,
-          rng,
-          bossWave: wave % 5 === 0,
-          halfWidth: 14,
-          halfDepth: 9,
-        });
-        return auditWaveTickets(wave, enc.tickets, enc.squads);
-      },
-      getEncounterSnapshot: () => ({
+      getEncounterSnapshotInternal: () => ({
         wave: this.waves.wave,
         squads: this.waves.squads,
         tickets: this.waves.lastTickets.map((t) => ({
@@ -2238,7 +2193,7 @@ export class Game {
         enemies: this.waves.listEnemies(),
         squadGroups: this.waves.squadController.snapshot(this.waves.enemies),
       }),
-      triggerHazard: (kind: string) => {
+      triggerHazardInternal: (kind) => {
         const k = kind as 'laser_gate' | 'shock_zone' | 'overload_core';
         if (k !== 'laser_gate' && k !== 'shock_zone' && k !== 'overload_core') {
           return { ok: false };
@@ -2246,14 +2201,14 @@ export class Game {
         const state = this.hazards.forceSpawn(k);
         return { ok: true, hazard: state };
       },
-      getHazardSnapshot: () => ({
+      getHazardSnapshotInternal: () => ({
         budget: hazardBudgetForWave(this.waves.wave),
         hazards: this.hazards.snapshot(),
         hazardKills: this.hazardKills,
         playerInShock: this.hazards.playerInShock(this.player),
       }),
-      planHazardSchedule: (wave: number, seed: number) => this.hazards.planSchedule(wave, seed),
-      debugHitEnemy: (id: string, damage: number, fromX?: number, fromZ?: number) => {
+      planHazardSchedule: (wave, seed) => this.hazards.planSchedule(wave, seed),
+      debugHitEnemyInternal: (id, damage, fromX, fromZ) => {
         const target = this.waves.enemies.find((e) => e.group.uuid === id || e.stats.kind === id);
         if (!target) return { ok: false, hp: 0, alive: false, kind: '' };
         const from =
@@ -2266,12 +2221,12 @@ export class Game {
         this.enemyBatch.sync(this.waves.enemies);
         return { ok: true, hp: target.hp, alive: target.alive, kind: target.stats.kind };
       },
-      getPlayerSoftControl: () => ({
+      getPlayerSoftControlInternal: () => ({
         moveSpeedMul: this.player.moveSpeedMul,
         heatCoolMul: this.player.heatCoolMul,
         disruptTimer: this.disruptTimer,
       }),
-      getBuildSnapshot: () => {
+      getBuildSnapshotInternal: () => {
         const resolved = resolveWeaponStats(this.combatBuild, this.weapon);
         const perWeaponDamage: Record<string, number> = {};
         for (const weaponId of Object.keys(WEAPON_DEFS) as WeaponId[]) {
@@ -2293,13 +2248,19 @@ export class Game {
           ruleCount: countRuleUpgrades(),
         };
       },
+      setEnemyPassive: (v) => {
+        this.debugFlags.enemyPassive = v;
+      },
+      setFreezeEnemies: (v) => {
+        this.debugFlags.freezeEnemies = v;
+      },
     };
   }
 
   private publishDiagnostics(): void {
     const info = this.renderer.info;
     const waveState = this.waves.getState();
-    window.__THREE_GAME_DIAGNOSTICS__ = buildDiagnostics({
+    publishGameDiagnostics({
       frame: this.frame,
       elapsed: this.elapsed,
       score: this.score,
