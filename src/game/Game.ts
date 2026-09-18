@@ -38,11 +38,16 @@ import { createCombatModifiers, EMERGENCY_HP_RATIO, EMERGENCY_SHIELD, HAZARD_BUF
 import { createCombatBuild, resetCombatBuild, resolveWeaponStats } from '../combat/CombatBuild';
 import { CombatSystem } from '../combat/CombatSystem';
 import {
-  advanceBossPhase,
   createBossRuntime,
-  getBossPhase,
   type BossRuntime,
 } from '../systems/BossPhases';
+import { BossDirector } from '../systems/BossDirector';
+import {
+  bossIdForWave,
+  getBossDef,
+  getBossPhaseById,
+  type BossId,
+} from '../systems/BossDefinitions';
 import { buildDiagnostics } from '../telemetry/buildDiagnostics';
 import { bossPhaseName, t, toggleLocale, upgradeText, weaponName, weaponShort } from '../i18n';
 
@@ -159,6 +164,8 @@ export class Game {
   private combat!: CombatSystem;
   private bossRuntime: BossRuntime = createBossRuntime();
   private lastBossRef: Enemy | null = null;
+  private bossDirector!: BossDirector;
+  private activeBossId: BossId = 'titan07';
   private fps = 60;
   private stressMode = false;
   private lowGraphics = false;
@@ -223,6 +230,30 @@ export class Game {
       getPlayerDamageMul: () => (this.debugFlags.oneShot ? 20 : 1),
       getEnemyOneHp: () => this.debugFlags.enemyOneHp,
       getEnemyPassive: () => this.debugFlags.enemyPassive,
+      getBossDamageMul: () => this.bossDirector?.incomingDamageMul() ?? 1,
+    });
+
+    this.bossDirector = new BossDirector({
+      waves: this.waves,
+      projectiles: this.projectiles,
+      player: this.player,
+      hazards: this.hazards,
+      rng: () => this.rng(),
+      onPhaseChange: (bossId, phase, boss) => {
+        this.activeBossId = bossId;
+        const def = getBossDef(bossId);
+        this.bossRuntime.phase = phase.id;
+        const phaseName = bossPhaseName(phase.id);
+        this.hud.showWaveBanner(t().bossDisplayName(def.nameKey, phaseName), true);
+        this.hud.pushKillFeed(t().bossPhase(phase.id, phaseName), 'boss');
+        this.feel.triggerHitstop(0.12);
+        this.feel.triggerFovPunch(5);
+        this.worldFx.triggerPulse(boss.group.position, phase.color, 8);
+        this.vfx.spawnBurst(boss.group.position.clone().setY(0.8), phase.color, 22, 8);
+      },
+      onBossMessage: (text) => {
+        this.hud.pushKillFeed(text, 'boss');
+      },
     });
 
     const stick = this.getElement('#touch-stick');
@@ -648,7 +679,10 @@ export class Game {
         ).normalize();
         if (enemy.stats.kind === 'boss') {
           this.updateBossPhase(enemy);
-          const phase = getBossPhase(this.bossRuntime.phase);
+          const phase = getBossPhaseById(
+            (enemy.bossId as BossId) || this.activeBossId,
+            this.bossDirector.state.phase,
+          );
           const count = phase.fanCount;
           const half = ((count - 1) / 2) * phase.fanSpread;
           for (let i = 0; i < count; i += 1) {
@@ -960,17 +994,11 @@ export class Game {
   }
 
   private updateBossPhase(enemy: Enemy): void {
-    const ratio = enemy.hp / enemy.maxHp;
-    const result = advanceBossPhase(this.bossRuntime, ratio);
-    enemy.bossPhaseColor = result.phase.color;
-    if (!result.changed) return;
-    const phaseName = bossPhaseName(result.phase.id);
-    this.hud.showWaveBanner(t().titanName(phaseName), true);
-    this.hud.pushKillFeed(t().bossPhase(result.phase.id, phaseName), 'boss');
-    this.feel.triggerHitstop(0.12);
-    this.feel.triggerFovPunch(5);
-    this.worldFx.triggerPulse(enemy.group.position, result.phase.color, 8);
-    this.vfx.spawnBurst(enemy.group.position.clone().setY(0.8), result.phase.color, 22, 8);
+    // Compatibility path — BossDirector owns live phase transitions now.
+    const bossId = (enemy.bossId as BossId) || bossIdForWave(this.waves.wave);
+    this.activeBossId = bossId;
+    this.bossDirector.setBoss(bossId);
+    this.bossDirector.applyPhaseStats(enemy);
   }
 
   private resolvePendingExplosions(): void {
@@ -1013,49 +1041,30 @@ export class Game {
     const boss = this.waves.boss;
     if (!boss) {
       this.lastBossRef = null;
+      this.bossDirector.tick(delta, null);
       return;
     }
     if (boss !== this.lastBossRef) {
-      this.bossRuntime = createBossRuntime();
       this.lastBossRef = boss;
+      const bossId = (boss.bossId as BossId) || bossIdForWave(this.waves.wave);
+      this.activeBossId = bossId;
+      this.bossDirector.setBoss(bossId);
+      this.bossRuntime = createBossRuntime();
     }
-    this.updateBossPhase(boss);
-    const phase = getBossPhase(this.bossRuntime.phase);
+    this.bossDirector.tick(delta, boss);
+    this.bossRuntime.phase = this.bossDirector.state.phase;
+    this.bossRuntime.summonTimer = this.bossDirector.state.summonTimer;
+    this.bossRuntime.ringTimer = this.bossDirector.state.ringTimer;
+    this.bossRuntime.spiralAngle = this.bossDirector.state.spiralAngle;
+    const phase = getBossPhaseById(this.activeBossId, this.bossDirector.state.phase);
     boss.bossPhaseColor = phase.color;
-    // Phase params drive real combat model — not just VFX density.
-    boss.moveSpeedMul = phase.moveSpeedMul;
-    boss.fireIntervalMul = phase.fireIntervalMul;
 
-    this.bossRuntime.summonTimer -= delta;
-    if (this.bossRuntime.summonTimer <= 0 && phase.summonCount > 0) {
-      this.bossRuntime.summonTimer = phase.summonEvery;
-      for (let i = 0; i < phase.summonCount; i += 1) {
-        this.waves.forceSpawnNear(boss.group.position, 'chaser');
-      }
-      this.hud.pushKillFeed(t().titanReinforcements, 'boss');
-    }
-
-    if (phase.ringEvery > 0) {
-      this.bossRuntime.ringTimer -= delta;
-      if (this.bossRuntime.ringTimer <= 0) {
-        this.bossRuntime.ringTimer = phase.ringEvery;
-        const origin = boss.group.position.clone().setY(0.55);
-        const spokes = phase.id === 3 ? 12 : 8;
-        for (let i = 0; i < spokes; i += 1) {
-          const a = this.bossRuntime.spiralAngle + (i / spokes) * Math.PI * 2;
-          const d = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
-          this.projectiles.spawn(
-            origin,
-            d,
-            boss.stats.projectileSpeed * 0.85,
-            boss.stats.projectileDamage * phase.projectileDamageMul * 0.75,
-            'enemy',
-            phase.color,
-          );
-        }
-        this.bossRuntime.spiralAngle += 0.35;
-        this.vfx.spawnBurst(origin, phase.color, 8, 4);
-      }
+    const shrink = this.bossDirector.arenaShrink;
+    if (shrink < 1) {
+      const hw = ARENA.halfWidth * shrink;
+      const hd = ARENA.halfDepth * shrink;
+      this.player.group.position.x = THREE.MathUtils.clamp(this.player.group.position.x, -hw, hw);
+      this.player.group.position.z = THREE.MathUtils.clamp(this.player.group.position.z, -hd, hd);
     }
   }
 
@@ -1259,6 +1268,8 @@ export class Game {
     resetCombatBuild(this.combatBuild, this.combatMods);
     this.bossRuntime = createBossRuntime();
     this.lastBossRef = null;
+    this.bossDirector.reset();
+    this.activeBossId = 'titan07';
     this.combat.reset();
     this.emergencyUsed = false;
     this.disruptMoveMul = 1;
@@ -1994,7 +2005,10 @@ export class Game {
           visible: Boolean(boss),
           hpRatio: boss ? boss.hp / boss.maxHp : 0,
           name: boss
-            ? dict.titanName(bossPhaseName(this.bossRuntime.phase))
+            ? dict.bossDisplayName(
+                getBossDef((boss.bossId as BossId) || this.activeBossId).nameKey,
+                bossPhaseName(this.bossDirector.state.phase),
+              )
             : 'TITAN-07',
         },
         waveBanner: null,
@@ -2090,6 +2104,49 @@ export class Game {
         }
         this.enemyBatch.sync(this.waves.enemies);
         return { ok: true, enemies: this.waves.enemies.length };
+      },
+      forceBoss: (id: string) => {
+        const bossId = id as BossId;
+        if (bossId !== 'titan07' && bossId !== 'orbital_warden' && bossId !== 'void_engine') {
+          return { ok: false };
+        }
+        this.waves.clearEnemies();
+        this.hazards.reset();
+        this.activeBossId = bossId;
+        this.bossDirector.reset();
+        this.bossDirector.setBoss(bossId);
+        this.waves.spawnAt('boss', 0, -4, bossId);
+        this.enemyBatch.sync(this.waves.enemies);
+        return {
+          ok: true,
+          bossId,
+          bosses: this.waves.enemies.filter((e) => e.stats.kind === 'boss').length,
+        };
+      },
+      setBossHpRatio: (ratio: number) => {
+        const boss = this.waves.boss;
+        if (!boss) return { ok: false };
+        const r = Math.min(1, Math.max(0.01, ratio));
+        boss.hp = Math.max(1, boss.maxHp * r);
+        this.bossDirector.setBoss((boss.bossId as BossId) || this.activeBossId);
+        this.bossDirector.applyPhaseStats(boss);
+        return {
+          ok: true,
+          hp: boss.hp,
+          maxHp: boss.maxHp,
+          phase: this.bossDirector.state.phase,
+          bossId: boss.bossId,
+        };
+      },
+      getBossSnapshot: () => {
+        const boss = this.waves.boss;
+        return {
+          activeBossId: this.activeBossId,
+          bossId: boss?.bossId ?? null,
+          alive: Boolean(boss?.alive),
+          hpRatio: boss ? boss.hp / boss.maxHp : 0,
+          director: this.bossDirector.snapshot(),
+        };
       },
       getEnemies: () => this.waves.listEnemies(),
       clearEnemies: () => {
@@ -2204,7 +2261,7 @@ export class Game {
       upgradeStacks: { ...this.upgradeStacks },
       weapon: this.weapon,
       modifiers: modifierIds(this.combatMods),
-      bossPhase: this.waves.boss ? this.bossRuntime.phase : null,
+      bossPhase: this.waves.boss ? this.bossDirector.state.phase : null,
       playerFormTier: this.player.getFormTier(),
       enemyFormTier: enemyFormTierForWave(waveState.wave),
       projectiles: this.projectiles.activeCount(),

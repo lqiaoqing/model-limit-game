@@ -54,6 +54,7 @@ type Dict = {
   titanReinforcements: string;
   bossPhase: (id: number, name: string) => string;
   titanName: (phase: string) => string;
+  bossDisplayName: (nameKey: string, phase: string) => string;
   overheatEmp: string;
   empCascade: string;
   shieldNova: string;
@@ -133,6 +134,14 @@ const zh: Dict = {
   titanReinforcements: '泰坦增援',
   bossPhase: (id, name) => `首领阶段 ${id} · ${name}`,
   titanName: (phase) => `TITAN-07 · ${phase}`,
+  bossDisplayName: (nameKey, phase) => {
+    const names: Record<string, string> = {
+      titan07: 'TITAN-07',
+      orbitalWarden: '轨道守卫',
+      voidEngine: '虚空引擎',
+    };
+    return `${names[nameKey] ?? 'TITAN-07'} · ${phase}`;
+  },
   overheatEmp: '过热 · 电磁脉冲',
   empCascade: '电磁级联',
   shieldNova: '护盾新星',
@@ -239,6 +248,14 @@ const en: Dict = {
   titanReinforcements: 'TITAN REINFORCEMENTS',
   bossPhase: (id, name) => `BOSS PHASE ${id} · ${name}`,
   titanName: (phase) => `TITAN-07 · ${phase}`,
+  bossDisplayName: (nameKey, phase) => {
+    const names: Record<string, string> = {
+      titan07: 'TITAN-07',
+      orbitalWarden: 'ORBITAL WARDEN',
+      voidEngine: 'VOID ENGINE',
+    };
+    return `${names[nameKey] ?? 'TITAN-07'} · ${phase}`;
+  },
   overheatEmp: 'OVERHEAT · EMP',
   empCascade: 'EMP CASCADE',
   shieldNova: 'SHIELD NOVA',

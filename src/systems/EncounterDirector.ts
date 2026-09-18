@@ -1,5 +1,6 @@
 import type { EnemyKind } from '../entities/Enemy';
 import { ENEMY_ARCHETYPES, isUnlocked } from './EnemyArchetypes';
+import { bossIdForWave } from './BossDefinitions';
 
 export type SquadRecipeId =
   | 'hunter_pack'
@@ -22,6 +23,8 @@ export type SpawnTicket = {
   offsetZ: number;
   /** Seconds to wait after wave start before this unit may enter. */
   delay: number;
+  /** Boss identity when kind === 'boss'. */
+  bossId?: string | null;
 };
 
 export type SquadRecipe = {
@@ -199,6 +202,7 @@ export function composeWaveTickets(options: {
         offsetX: 0,
         offsetZ: 0,
         delay: 0,
+        bossId: bossIdForWave(wave),
       });
     }
     // Stress stays chaser-heavy so the flood remains a lethal ceiling test.
@@ -232,6 +236,7 @@ export function composeWaveTickets(options: {
       offsetX: 0,
       offsetZ: 0,
       delay: 0,
+      bossId: bossIdForWave(wave),
     });
   }
 

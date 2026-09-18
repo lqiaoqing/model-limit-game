@@ -193,8 +193,13 @@ export class WaveDirector {
   }
 
   /** Deterministic spawn at an exact world XZ (test hooks / scripted setups). */
-  spawnAt(kind: EnemyKind, x: number, z: number): void {
-    this.spawnEnemyAt(kind, x, z);
+  spawnAt(kind: EnemyKind, x: number, z: number, bossId?: string | null): Enemy | null {
+    const enemy = this.spawnEnemyAt(kind, x, z);
+    if (enemy && kind === 'boss') {
+      enemy.bossId = bossId ?? 'titan07';
+      this.bossRef = enemy;
+    }
+    return enemy;
   }
 
   listEnemies(): Array<{
@@ -254,6 +259,7 @@ export class WaveDirector {
     if (enemy) {
       enemy.squadId = ticket.squadId;
       enemy.squadAnchor = ticket.anchor;
+      if (ticket.kind === 'boss' && ticket.bossId) enemy.bossId = ticket.bossId;
     }
   }
 

@@ -26,6 +26,7 @@ export type EnemyStats = {
   color: string;
   emissive: string;
   scale: number;
+  bossId?: string | null;
 };
 
 export type PendingExplosion = {
@@ -191,6 +192,8 @@ export class Enemy {
   readonly formTier: EnemyFormTier;
   /** Titan phase emissive tint; null keeps template color. */
   bossPhaseColor: string | null = null;
+  /** Which boss identity this unit represents when kind === 'boss'. */
+  bossId: string | null = null;
   /** Bomber fuse countdown; <0 = not armed. */
   fuseTimer = -1;
   /** Set when this unit should explode this frame (fuse or death). */
@@ -232,6 +235,7 @@ export class Enemy {
     this.phase = seedPhase % 1;
     this.group.position.copy(position);
     this.fireTimer = stats.fireInterval * 0.4 + seedPhase * 0.3;
+    this.bossId = stats.bossId ?? null;
   }
 
   hideLegacyVisual(): void {

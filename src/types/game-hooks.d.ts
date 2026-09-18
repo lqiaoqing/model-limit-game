@@ -26,6 +26,28 @@ declare global {
       }>;
       clearEnemies?: () => { ok: boolean; enemies: number };
       forceWave?: (wave: number) => { wave: number; squads: string[] };
+      forceBoss?: (id: string) => { ok: boolean; bossId?: string; bosses?: number };
+      setBossHpRatio?: (ratio: number) => {
+        ok: boolean;
+        hp?: number;
+        maxHp?: number;
+        phase?: number;
+        bossId?: string | null;
+      };
+      getBossSnapshot?: () => {
+        activeBossId: string;
+        bossId: string | null;
+        alive: boolean;
+        hpRatio: number;
+        director: {
+          bossId: string | null;
+          phase: number;
+          shieldActive: boolean;
+          shieldDrones: number;
+          arenaShrink: number;
+          beamAngle: number;
+        };
+      };
       composeEncounter?: (
         wave: number,
         seed: number,
@@ -37,6 +59,7 @@ declare global {
           delay: number;
           offsetX: number;
           offsetZ: number;
+          bossId?: string | null;
         }>;
         squads: string[];
         budgetLeft: number;

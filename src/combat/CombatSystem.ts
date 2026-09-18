@@ -69,6 +69,8 @@ export type CombatDeps = {
   getEnemyOneHp?: () => boolean;
   /** Debug: enemy projectiles deal no player damage. */
   getEnemyPassive?: () => boolean;
+  /** Boss incoming damage multiplier (warden shield etc.). */
+  getBossDamageMul?: () => number;
 };
 
 /** Weapon fire, projectile hits, and rule-modifier combat side effects. */
@@ -231,6 +233,9 @@ export class CombatSystem {
       const playerMul = this.deps.getPlayerDamageMul?.() ?? 1;
       if (playerMul !== 1) dmg *= playerMul;
       if (this.deps.getEnemyOneHp?.()) dmg = Math.max(dmg, 999999);
+      if (enemy.stats.kind === 'boss') {
+        dmg *= this.deps.getBossDamageMul?.() ?? 1;
+      }
       const died = enemy.takeDamage(dmg, pos);
       totalDamage += dmg;
       onDamageDealt?.(dmg, 'launcher');
@@ -349,6 +354,9 @@ export class CombatSystem {
             const playerMul = this.deps.getPlayerDamageMul?.() ?? 1;
             if (playerMul !== 1) dmg *= playerMul;
             if (this.deps.getEnemyOneHp?.()) dmg = Math.max(dmg, 999999);
+            if (enemy.stats.kind === 'boss') {
+              dmg *= this.deps.getBossDamageMul?.() ?? 1;
+            }
             const close =
               p.sourceWeapon === 'scatter' &&
               pos.distanceTo(player.group.position) < SCATTER_CLOSE_RANGE;
